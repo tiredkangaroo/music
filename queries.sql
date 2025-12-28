@@ -56,11 +56,35 @@ DELETE FROM playlists WHERE id = $1;
 INSERT INTO playlist_tracks (playlist_id, track_id)
 VALUES ($1, $2);
 
--- name: ListPlaylistTracks :many
-SELECT t.track_id, t.track_name, t.duration, t.popularity, t.album_id, t.artist_id, t.artists, t.track_release_date
-FROM tracks t
-JOIN playlist_tracks pt ON t.track_id = pt.track_id
-WHERE pt.playlist_id = $1;
+-- name: GetPlaylist :one
+SELECT
+    p.id,
+    p.name,
+    p.description,
+    p.image_url,
+    p.created_at,
+    COALESCE(
+        json_agg(
+            json_build_object(
+                'track_id', t.track_id,
+                'track_name', t.track_name,
+                'duration', t.duration,
+                'popularity', t.popularity,
+                'album_id', t.album_id,
+                'artist_id', t.artist_id,
+                'artists', t.artists,
+                'track_release_date', t.track_release_date
+            )
+        ) FILTER (WHERE t.track_id IS NOT NULL),
+        '[]'::json
+    ) AS tracks
+FROM playlists p
+LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
+LEFT JOIN tracks t ON t.track_id = pt.track_id
+WHERE p.id = $1
+GROUP BY p.id;
+
+
 
 -- name: RemoveTrackFromPlaylist :exec
 DELETE FROM playlist_tracks

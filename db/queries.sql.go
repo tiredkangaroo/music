@@ -17,8 +17,8 @@ VALUES ($1, $2)
 `
 
 type AddTrackToPlaylistParams struct {
-	PlaylistID pgtype.UUID
-	TrackID    string
+	PlaylistID pgtype.UUID `json:"playlist_id"`
+	TrackID    string      `json:"track_id"`
 }
 
 func (q *Queries) AddTrackToPlaylist(ctx context.Context, arg AddTrackToPlaylistParams) error {
@@ -33,9 +33,9 @@ RETURNING id
 `
 
 type CreatePlaylistParams struct {
-	Name        string
-	Description string
-	ImageUrl    string
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ImageUrl    string `json:"image_url"`
 }
 
 func (q *Queries) CreatePlaylist(ctx context.Context, arg CreatePlaylistParams) (pgtype.UUID, error) {
@@ -52,6 +52,58 @@ DELETE FROM playlists WHERE id = $1
 func (q *Queries) DeletePlaylist(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, deletePlaylist, id)
 	return err
+}
+
+const getPlaylist = `-- name: GetPlaylist :one
+SELECT
+    p.id,
+    p.name,
+    p.description,
+    p.image_url,
+    p.created_at,
+    COALESCE(
+        json_agg(
+            json_build_object(
+                'track_id', t.track_id,
+                'track_name', t.track_name,
+                'duration', t.duration,
+                'popularity', t.popularity,
+                'album_id', t.album_id,
+                'artist_id', t.artist_id,
+                'artists', t.artists,
+                'track_release_date', t.track_release_date
+            )
+        ) FILTER (WHERE t.track_id IS NOT NULL),
+        '[]'::json
+    ) AS tracks
+FROM playlists p
+LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
+LEFT JOIN tracks t ON t.track_id = pt.track_id
+WHERE p.id = $1
+GROUP BY p.id
+`
+
+type GetPlaylistRow struct {
+	ID          pgtype.UUID      `json:"id"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	ImageUrl    string           `json:"image_url"`
+	CreatedAt   pgtype.Timestamp `json:"created_at"`
+	Tracks      interface{}      `json:"tracks"`
+}
+
+func (q *Queries) GetPlaylist(ctx context.Context, id pgtype.UUID) (GetPlaylistRow, error) {
+	row := q.db.QueryRow(ctx, getPlaylist, id)
+	var i GetPlaylistRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.ImageUrl,
+		&i.CreatedAt,
+		&i.Tracks,
+	)
+	return i, err
 }
 
 const getTrackByID = `-- name: GetTrackByID :one
@@ -109,18 +161,18 @@ ON CONFLICT (track_id) DO NOTHING
 `
 
 type InsertTrackParams struct {
-	ArtistID         string
-	ArtistName       string
-	AlbumID          string
-	AlbumName        string
-	CoverUrl         string
-	AlbumReleaseDate pgtype.Date
-	TrackID          string
-	TrackName        string
-	Duration         int32
-	Popularity       int32
-	Artists          []string
-	TrackReleaseDate pgtype.Date
+	ArtistID         string      `json:"artist_id"`
+	ArtistName       string      `json:"artist_name"`
+	AlbumID          string      `json:"album_id"`
+	AlbumName        string      `json:"album_name"`
+	CoverUrl         string      `json:"cover_url"`
+	AlbumReleaseDate pgtype.Date `json:"album_release_date"`
+	TrackID          string      `json:"track_id"`
+	TrackName        string      `json:"track_name"`
+	Duration         int32       `json:"duration"`
+	Popularity       int32       `json:"popularity"`
+	Artists          []string    `json:"artists"`
+	TrackReleaseDate pgtype.Date `json:"track_release_date"`
 }
 
 func (q *Queries) InsertTrack(ctx context.Context, arg InsertTrackParams) error {
@@ -139,42 +191,6 @@ func (q *Queries) InsertTrack(ctx context.Context, arg InsertTrackParams) error 
 		arg.TrackReleaseDate,
 	)
 	return err
-}
-
-const listPlaylistTracks = `-- name: ListPlaylistTracks :many
-SELECT t.track_id, t.track_name, t.duration, t.popularity, t.album_id, t.artist_id, t.artists, t.track_release_date
-FROM tracks t
-JOIN playlist_tracks pt ON t.track_id = pt.track_id
-WHERE pt.playlist_id = $1
-`
-
-func (q *Queries) ListPlaylistTracks(ctx context.Context, playlistID pgtype.UUID) ([]Track, error) {
-	rows, err := q.db.Query(ctx, listPlaylistTracks, playlistID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Track
-	for rows.Next() {
-		var i Track
-		if err := rows.Scan(
-			&i.TrackID,
-			&i.TrackName,
-			&i.Duration,
-			&i.Popularity,
-			&i.AlbumID,
-			&i.ArtistID,
-			&i.Artists,
-			&i.TrackReleaseDate,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listPlaylists = `-- name: ListPlaylists :many
@@ -214,9 +230,9 @@ ON CONFLICT (track_id, played_at) DO NOTHING
 `
 
 type RecordPlayParams struct {
-	TrackID   string
-	PlayedAt  pgtype.Timestamp
-	SkippedAt pgtype.Int4
+	TrackID   string           `json:"track_id"`
+	PlayedAt  pgtype.Timestamp `json:"played_at"`
+	SkippedAt pgtype.Int4      `json:"skipped_at"`
 }
 
 func (q *Queries) RecordPlay(ctx context.Context, arg RecordPlayParams) error {
@@ -231,9 +247,9 @@ WHERE track_id = $2 AND played_at = $3
 `
 
 type RecordSkipParams struct {
-	SkippedAt pgtype.Int4
-	TrackID   string
-	PlayedAt  pgtype.Timestamp
+	SkippedAt pgtype.Int4      `json:"skipped_at"`
+	TrackID   string           `json:"track_id"`
+	PlayedAt  pgtype.Timestamp `json:"played_at"`
 }
 
 func (q *Queries) RecordSkip(ctx context.Context, arg RecordSkipParams) error {
@@ -247,8 +263,8 @@ WHERE playlist_id = $1 AND track_id = $2
 `
 
 type RemoveTrackFromPlaylistParams struct {
-	PlaylistID pgtype.UUID
-	TrackID    string
+	PlaylistID pgtype.UUID `json:"playlist_id"`
+	TrackID    string      `json:"track_id"`
 }
 
 func (q *Queries) RemoveTrackFromPlaylist(ctx context.Context, arg RemoveTrackFromPlaylistParams) error {
@@ -265,27 +281,27 @@ LIMIT $2 OFFSET $3
 `
 
 type SearchTrackByNameParams struct {
-	Column1 pgtype.Text
-	Limit   int32
-	Offset  int32
+	Column1 pgtype.Text `json:"column_1"`
+	Limit   int32       `json:"limit"`
+	Offset  int32       `json:"offset"`
 }
 
 type SearchTrackByNameRow struct {
-	TrackID          string
-	TrackName        string
-	Duration         int32
-	Popularity       int32
-	AlbumID          string
-	ArtistID         string
-	Artists          []string
-	TrackReleaseDate pgtype.Date
-	AlbumID_2        string
-	AlbumName        string
-	ArtistID_2       string
-	CoverUrl         string
-	AlbumReleaseDate pgtype.Date
-	ArtistID_3       string
-	ArtistName       string
+	TrackID          string      `json:"track_id"`
+	TrackName        string      `json:"track_name"`
+	Duration         int32       `json:"duration"`
+	Popularity       int32       `json:"popularity"`
+	AlbumID          string      `json:"album_id"`
+	ArtistID         string      `json:"artist_id"`
+	Artists          []string    `json:"artists"`
+	TrackReleaseDate pgtype.Date `json:"track_release_date"`
+	AlbumID_2        string      `json:"album_id_2"`
+	AlbumName        string      `json:"album_name"`
+	ArtistID_2       string      `json:"artist_id_2"`
+	CoverUrl         string      `json:"cover_url"`
+	AlbumReleaseDate pgtype.Date `json:"album_release_date"`
+	ArtistID_3       string      `json:"artist_id_3"`
+	ArtistName       string      `json:"artist_name"`
 }
 
 func (q *Queries) SearchTrackByName(ctx context.Context, arg SearchTrackByNameParams) ([]SearchTrackByNameRow, error) {

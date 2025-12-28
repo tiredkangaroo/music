@@ -8,6 +8,7 @@ sql:
         out: "db"
         package: "db"
         sql_package: "pgx/v5"
+        emit_json_tags: true
 overrides:
   go: null
 plugins: []

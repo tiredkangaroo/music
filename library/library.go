@@ -36,6 +36,9 @@ type Library struct {
 // link to a spotify track, album or playlist, or it can be a search query like
 // "Blinding Lights - The Weeknd".
 func (l *Library) Download(ctx context.Context, things []string) error {
+	if env.DefaultEnv.Debug {
+		slog.Debug("downloading", "things", things)
+	}
 	args := []string{"download"}
 	args = append(args, things...)
 	args = append(args, "--save-file", "metadata.spotdl", "--output", "{track-id}")
@@ -48,6 +51,8 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("spotdl command failed: %w\nlogs: %s", err, logs.String())
+	} else if env.DefaultEnv.Debug {
+		slog.Debug("spotdl logs", "logs", logs.String())
 	}
 	mdfile := filepath.Join(l.storagePath, "metadata.spotdl")
 	defer os.Remove(mdfile)
@@ -134,13 +139,13 @@ func (l *Library) DeletePlaylist(ctx context.Context, playlistID string) error {
 	return l.queries.DeletePlaylist(ctx, optuuid(id))
 }
 
-// ListPlaylistTracks returns all tracks in the specified playlist.
-func (l *Library) ListPlaylistTracks(ctx context.Context, playlistID string) ([]queries.Track, error) {
+// GetPlaylist returns information about the specified playlist including its tracks.
+func (l *Library) GetPlaylist(ctx context.Context, playlistID string) (queries.GetPlaylistRow, error) {
 	id, err := uuid.Parse(playlistID) // validate uuid
 	if err != nil {
-		return nil, fmt.Errorf("invalid playlist id: %w", err)
+		return queries.GetPlaylistRow{}, fmt.Errorf("invalid playlist id: %w", err)
 	}
-	return l.queries.ListPlaylistTracks(ctx, optuuid(id))
+	return l.queries.GetPlaylist(ctx, optuuid(id))
 }
 
 // AddTrackToPlaylist adds the specified track to the specified playlist.
@@ -155,6 +160,18 @@ func (l *Library) AddTrackToPlaylist(ctx context.Context, playlistID, trackID st
 	})
 }
 
+// RemoveTrackFromPlaylist removes the specified track from the specified playlist.
+func (l *Library) RemoveTrackFromPlaylist(ctx context.Context, playlistID, trackID string) error {
+	pid, err := uuid.Parse(playlistID) // validate uuid
+	if err != nil {
+		return fmt.Errorf("invalid playlist id: %w", err)
+	}
+	return l.queries.RemoveTrackFromPlaylist(ctx, queries.RemoveTrackFromPlaylistParams{
+		PlaylistID: optuuid(pid),
+		TrackID:    trackID,
+	})
+}
+
 // Play returns a ReadCloser for the audio file for the specified track.
 // It also records the play in the database. If the file is not found in storage,
 // it downloads the track before returning the ReadCloser.
@@ -162,7 +179,8 @@ func (l *Library) Play(ctx context.Context, trackID string) (io.ReadCloser, erro
 	// where older tracks may be deleted from storage for space management
 	// but their metadata remains in the database so it can be played
 	// the file should be re-downloaded if not found
-	rd, err := os.Open(filepath.Join(l.storagePath, filepath.Clean(trackID)))
+	p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".mp3")
+	rd, err := os.Open(p)
 	if err == nil {
 		l.RecordPlay(ctx, trackID)
 		return rd, nil
@@ -175,7 +193,7 @@ func (l *Library) Play(ctx context.Context, trackID string) (io.ReadCloser, erro
 	if err := l.Download(ctx, []string{"https://open.spotify.com/track/" + trackID}); err != nil {
 		return nil, fmt.Errorf("download track: %w", err)
 	}
-	return os.Open(filepath.Join(l.storagePath, filepath.Clean(trackID)))
+	return os.Open(p)
 }
 
 // RecordPlay records a play of the specified track in the database.

@@ -9,44 +9,44 @@ import (
 )
 
 type Album struct {
-	AlbumID          string
-	AlbumName        string
-	ArtistID         string
-	CoverUrl         string
-	AlbumReleaseDate pgtype.Date
+	AlbumID          string      `json:"album_id"`
+	AlbumName        string      `json:"album_name"`
+	ArtistID         string      `json:"artist_id"`
+	CoverUrl         string      `json:"cover_url"`
+	AlbumReleaseDate pgtype.Date `json:"album_release_date"`
 }
 
 type Artist struct {
-	ArtistID   string
-	ArtistName string
+	ArtistID   string `json:"artist_id"`
+	ArtistName string `json:"artist_name"`
 }
 
 type Play struct {
-	TrackID   string
-	PlayedAt  pgtype.Timestamp
-	SkippedAt pgtype.Int4
+	TrackID   string           `json:"track_id"`
+	PlayedAt  pgtype.Timestamp `json:"played_at"`
+	SkippedAt pgtype.Int4      `json:"skipped_at"`
 }
 
 type Playlist struct {
-	ID          pgtype.UUID
-	Name        string
-	Description string
-	ImageUrl    string
-	CreatedAt   pgtype.Timestamp
+	ID          pgtype.UUID      `json:"id"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	ImageUrl    string           `json:"image_url"`
+	CreatedAt   pgtype.Timestamp `json:"created_at"`
 }
 
 type PlaylistTrack struct {
-	PlaylistID pgtype.UUID
-	TrackID    string
+	PlaylistID pgtype.UUID `json:"playlist_id"`
+	TrackID    string      `json:"track_id"`
 }
 
 type Track struct {
-	TrackID          string
-	TrackName        string
-	Duration         int32
-	Popularity       int32
-	AlbumID          string
-	ArtistID         string
-	Artists          []string
-	TrackReleaseDate pgtype.Date
+	TrackID          string      `json:"track_id"`
+	TrackName        string      `json:"track_name"`
+	Duration         int32       `json:"duration"`
+	Popularity       int32       `json:"popularity"`
+	AlbumID          string      `json:"album_id"`
+	ArtistID         string      `json:"artist_id"`
+	Artists          []string    `json:"artists"`
+	TrackReleaseDate pgtype.Date `json:"track_release_date"`
 }

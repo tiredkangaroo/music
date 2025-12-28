@@ -2,15 +2,22 @@ package main
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/tiredkangaroo/music/env"
 	"github.com/tiredkangaroo/music/library"
+	"github.com/tiredkangaroo/music/server"
 )
 
 func main() {
 	if err := env.Init(); err != nil {
 		panic(err)
+	}
+	if env.DefaultEnv.Debug {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	} else {
+		slog.SetLogLoggerLevel(slog.LevelInfo)
 	}
 
 	ctx := context.Background()
@@ -22,11 +29,8 @@ func main() {
 
 	lib := library.NewLibrary("/Users/ajiteshkumar/Documents/projects/music/experiment", conn)
 
-	s, err := lib.Search(ctx, "dumb")
-	if err != nil {
+	srv := server.NewServer(lib)
+	if err := srv.Serve(); err != nil {
 		panic(err)
-	}
-	for _, track := range s {
-		println(track.TrackName, "by", track.ArtistName)
 	}
 }
