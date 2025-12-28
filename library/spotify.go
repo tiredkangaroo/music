@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
-)
 
-var spotifyClientID = os.Getenv("SPOTIFY_CLIENT_ID")
-var spotifyClientSecret = os.Getenv("SPOTIFY_CLIENT_SECRET")
+	"github.com/tiredkangaroo/music/env"
+)
 
 type spotifyToken struct {
 	tk        string
@@ -42,7 +40,7 @@ func (t *spotifyToken) getToken(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	req.SetBasicAuth(spotifyClientID, spotifyClientSecret)
+	req.SetBasicAuth(env.DefaultEnv.SpotifyClientID, env.DefaultEnv.SpotifyClientSecret)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := http.DefaultClient.Do(req)

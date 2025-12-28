@@ -4,10 +4,15 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/tiredkangaroo/music/env"
 	"github.com/tiredkangaroo/music/library"
 )
 
 func main() {
+	if err := env.Init(); err != nil {
+		panic(err)
+	}
+
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, "postgres://musicer:@localhost:5432/music")
 	if err != nil {
@@ -15,21 +20,13 @@ func main() {
 	}
 	defer conn.Close(ctx)
 
-	lib, err := library.NewLibrary("[path to storage]", conn)
-	if err != nil {
-		panic(err)
-	}
+	lib := library.NewLibrary("/Users/ajiteshkumar/Documents/projects/music/experiment", conn)
 
-	err = lib.Download(ctx, []string{"download item 1", "download item 2"})
-	if err != nil {
-		panic(err)
-	}
-
-	s, err := lib.Search(ctx, "song name")
+	s, err := lib.Search(ctx, "dumb")
 	if err != nil {
 		panic(err)
 	}
 	for _, track := range s {
-		println(track.TrackName)
+		println(track.TrackName, "by", track.ArtistName)
 	}
 }

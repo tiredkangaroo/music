@@ -20,9 +20,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	queries "github.com/tiredkangaroo/music/db"
+	"github.com/tiredkangaroo/music/env"
 )
-
-var pathToSpotDL = os.Getenv("SPOTDL_PATH")
 
 // Library represents a music library.
 type Library struct {
@@ -42,7 +41,7 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 	args = append(args, "--save-file", "metadata.spotdl", "--output", "{track-id}")
 
 	logs := new(bytes.Buffer)
-	cmd := exec.Command(pathToSpotDL, args...)
+	cmd := exec.Command(env.DefaultEnv.PathToSpotDL, args...)
 	cmd.Stdout = logs
 	cmd.Stderr = logs
 	cmd.Dir = l.storagePath
@@ -216,7 +215,6 @@ func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTra
 	q.Add("offset", "0")
 	u.RawQuery = q.Encode()
 
-	fmt.Println(u.String())
 	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create search request: %w", err)
@@ -328,11 +326,7 @@ func releaseDate(d string) pgtype.Date {
 	return track_date
 }
 
-func NewLibrary(storagePath string, conn *pgx.Conn) (*Library, error) {
-	if pathToSpotDL == "" {
-		return nil, fmt.Errorf("SPOTDL_PATH environment variable not set")
-	}
+func NewLibrary(storagePath string, conn *pgx.Conn) *Library {
 	q := queries.New(conn)
-
-	return &Library{storagePath: storagePath, conn: conn, queries: q, spotifyToken: new(spotifyToken)}, nil
+	return &Library{storagePath: storagePath, conn: conn, queries: q, spotifyToken: new(spotifyToken)}
 }
