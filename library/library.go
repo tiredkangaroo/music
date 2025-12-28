@@ -41,7 +41,7 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 	}
 	args := []string{"download"}
 	args = append(args, things...)
-	args = append(args, "--save-file", "metadata.spotdl", "--output", "{track-id}")
+	args = append(args, "--save-file", "metadata.spotdl", "--output", "{track-id}", "--format", "m4a", "--bitrate", "auto")
 
 	logs := new(bytes.Buffer)
 	cmd := exec.Command(env.DefaultEnv.PathToSpotDL, args...)
@@ -179,7 +179,7 @@ func (l *Library) Play(ctx context.Context, trackID string) (io.ReadCloser, erro
 	// where older tracks may be deleted from storage for space management
 	// but their metadata remains in the database so it can be played
 	// the file should be re-downloaded if not found
-	p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".mp3")
+	p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
 	rd, err := os.Open(p)
 	if err == nil {
 		l.RecordPlay(ctx, trackID)

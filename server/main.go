@@ -41,7 +41,7 @@ func (s *Server) Serve() error {
 			return c.JSON(500, errormap(err.Error()))
 		}
 		defer data.Close()
-		return c.Stream(http.StatusOK, mime.TypeByExtension(".mp3"), data)
+		return c.Stream(http.StatusOK, mime.TypeByExtension(".m4a"), data)
 	})
 
 	e.GET("/playlists", func(c echo.Context) error {
