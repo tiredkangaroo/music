@@ -30,7 +30,7 @@ export function PlaylistView(props: {
           <img
             src={playlist.image_url}
             alt={playlist.name}
-            className="w-48 h-48 object-cover rounded-md"
+            className="w-48 h-48 object-cover"
           />
           <div>
             <h1 className="text-5xl font-bold">{playlist.name}</h1>

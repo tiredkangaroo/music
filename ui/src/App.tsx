@@ -94,12 +94,41 @@ function Player() {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isWaiting, setIsWaiting] = useState(true);
+
+  useEffect(() => {
+    if (!audioRef.current) return;
+
+    const onWaiting = () => setIsWaiting(true);
+    const onPlaying = () => setIsWaiting(false);
+
+    audioRef.current.addEventListener("waiting", onWaiting);
+    audioRef.current.addEventListener("playing", onPlaying);
+    audioRef.current.addEventListener("canplay", onPlaying);
+
+    return () => {
+      audioRef.current?.removeEventListener("waiting", onWaiting);
+      audioRef.current?.removeEventListener("playing", onPlaying);
+      audioRef.current?.removeEventListener("canplay", onPlaying);
+    };
+  }, [audioRef.current]);
 
   if (!playerTrack) return <></>;
   return (
-    <div className="relative h-[12%] min-h-fit border-t-8 border-black bg-white flex flex-row items-center px-4 py-2 gap-4">
+    <div
+      className="relative h-[12%] min-h-fit border-t-8 border-black bg-white flex flex-row items-center px-4 py-2 gap-4"
+      inert={isWaiting}
+    >
       <div className="h-full">
-        <img src={playerTrack.cover_url} className="h-full" />
+        <img
+          src={playerTrack.cover_url}
+          className="h-full w-full object-cover"
+        />
+        {isWaiting && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 pointer-events-auto">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-white" />
+          </div>
+        )}
       </div>
       <div className="w-[20%] wrap-break-word">
         <h2 className="font-semibold">{playerTrack.track_name}</h2>

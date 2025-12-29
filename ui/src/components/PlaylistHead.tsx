@@ -6,7 +6,7 @@ export function PlaylistHeadView(props: { playlist: PlaylistHead }) {
       <img
         src={playlist.image_url}
         alt={playlist.name}
-        className="w-[20%] aspect-square object-cover rounded-md"
+        className="w-[20%] aspect-square object-cover"
       />
       <div>
         <h2 className="text-xl font-semibold">{playlist.name}</h2>

@@ -171,7 +171,7 @@ func (l *Library) AddTrackToPlaylist(ctx context.Context, playlistID, trackID st
 	if err != nil {
 		return fmt.Errorf("invalid playlist id: %w", err)
 	}
-	l.DownloadIfNotExists(ctx, trackID) // best effort download, ignore error
+	go l.DownloadIfNotExists(ctx, trackID) // best effort download, ignore error, work in a seperate goroutine
 	return l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
 		PlaylistID: optuuid(pid),
 		TrackID:    trackID,
