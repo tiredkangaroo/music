@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,8 +18,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	queries "github.com/tiredkangaroo/music/db"
 	"github.com/tiredkangaroo/music/env"
 )
@@ -26,7 +27,7 @@ import (
 // Library represents a music library.
 type Library struct {
 	storagePath string
-	conn        *pgx.Conn
+	pool        *pgxpool.Pool
 	queries     *queries.Queries
 
 	spotifyToken *spotifyToken
@@ -81,7 +82,7 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 		return err
 	}
 
-	tx, err := l.conn.Begin(ctx)
+	tx, err := l.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
@@ -112,6 +113,22 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 		return fmt.Errorf("commit tx: %w", err)
 	}
 
+	return nil
+}
+
+// DownloadIfNotExists checks if the track with the specified ID exists in storage,
+// and downloads it if it is missing. It is intended to be slightly cheaper than Download
+// because it does not run spotdl and does not update the database and extract metadata if
+// the track already exists.
+func (l *Library) DownloadIfNotExists(ctx context.Context, trackIDs ...string) error {
+	for i, trackID := range trackIDs {
+		p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			if err := l.Download(ctx, []string{"https://open.spotify.com/track/" + trackID}); err != nil {
+				return fmt.Errorf("download track %s (successfully downloaded %d/%d): %w", trackID, i, len(trackIDs), err)
+			}
+		}
+	}
 	return nil
 }
 
@@ -154,6 +171,7 @@ func (l *Library) AddTrackToPlaylist(ctx context.Context, playlistID, trackID st
 	if err != nil {
 		return fmt.Errorf("invalid playlist id: %w", err)
 	}
+	l.DownloadIfNotExists(ctx, trackID) // best effort download, ignore error
 	return l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
 		PlaylistID: optuuid(pid),
 		TrackID:    trackID,
@@ -324,8 +342,21 @@ func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTra
 	}
 
 	slices.SortFunc(results, func(a, b queries.SearchTrackByNameRow) int {
-		// sort by popularity descending
-		return int(b.Popularity - a.Popularity)
+		// sort by exact name match first and popularity
+		weight := math.Min(math.Abs(float64(len(a.TrackName)-len(query)))-math.Abs(float64(len(b.TrackName)-len(query))), 5) // closer length to query is better
+		// a is closer? negative weight, a is better
+		// b is closer? positive weight, b is better
+		// weight is capped at 5 to prevent popularity from being overshadowed too much
+
+		// include popularity in the weight, higher popularity is better
+		weight -= math.Min(float64(a.Popularity-b.Popularity), 50) / 10 // a is more popular? subtract from weight, making a better
+		// if weight is negative, a is better than b
+		// if weight is positive, b is better than a
+		// popularity difference is capped at 5 to prevent it from overshadowing name length too much
+		// divided by x to reduce its impact compared to name length, a 20 popularity difference is equivalent to 2 character length difference if x=10
+		// this number should be tuned for best results
+
+		return int(weight)
 	})
 	return results, nil
 }
@@ -344,7 +375,7 @@ func releaseDate(d string) pgtype.Date {
 	return track_date
 }
 
-func NewLibrary(storagePath string, conn *pgx.Conn) *Library {
-	q := queries.New(conn)
-	return &Library{storagePath: storagePath, conn: conn, queries: q, spotifyToken: new(spotifyToken)}
+func NewLibrary(storagePath string, pool *pgxpool.Pool) *Library {
+	q := queries.New(pool)
+	return &Library{storagePath: storagePath, pool: pool, queries: q, spotifyToken: new(spotifyToken)}
 }

@@ -19,6 +19,10 @@ func (s *Server) Serve() error {
 	e := echo.New()
 	e.Use(middleware.RequestLogger())
 
+	if env.DefaultEnv.Debug {
+		e.Use(middleware.CORS())
+	}
+
 	e.GET("/search", func(c echo.Context) error {
 		query := c.QueryParam("q")
 		if query == "" {

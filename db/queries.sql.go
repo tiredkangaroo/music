@@ -71,6 +71,7 @@ SELECT
                 'album_id', t.album_id,
                 'artist_id', t.artist_id,
                 'artists', t.artists,
+                'cover_url', a.cover_url,
                 'track_release_date', t.track_release_date
             )
         ) FILTER (WHERE t.track_id IS NOT NULL),
@@ -79,6 +80,7 @@ SELECT
 FROM playlists p
 LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
 LEFT JOIN tracks t ON t.track_id = pt.track_id
+LEFT JOIN albums a ON t.album_id = a.album_id
 WHERE p.id = $1
 GROUP BY p.id
 `
