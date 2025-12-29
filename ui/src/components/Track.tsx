@@ -1,17 +1,32 @@
 import { useContext } from "react";
 import type { Track } from "../types.ts";
-import { SetPlayerTrackContext } from "../PlayerContext.tsx";
+import { PlayerContext, SetPlayerContext } from "../PlayerContext.tsx";
 export function TrackView(props: {
   track: Track;
   addTrack?: () => void;
   removeTrack?: () => void;
 }) {
-  const setPlayerTrack = useContext(SetPlayerTrackContext);
+  //   const playerState = useContext(PlayerContext);
+  const setPlayerState = useContext(SetPlayerContext);
   const { track } = props;
   return (
     <div
       className="p-4 border-t-3 border-l-3 border-r-6 border-b-6 border-gray-300 cursor-pointer"
-      onClick={() => setPlayerTrack(track)}
+      // play track on click (resetting the queue)
+      onClick={() =>
+        setPlayerState({
+          currentTrack: track,
+          isPlaying: true,
+          currentTime: 0,
+          duration: track.duration,
+          //   queuedTracks: playerState.queuedTracks,
+          queuedTracks: [],
+          repeat: "off",
+          previousTracks: [],
+          fromPlaylist: null,
+          shuffle: false,
+        })
+      }
     >
       <div className="flex flex-row justify-between items-center">
         <div className="flex flex-row gap-4 ">

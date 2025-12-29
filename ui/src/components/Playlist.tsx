@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import type { Playlist, Track } from "../types";
 import { TrackView } from "./Track";
 import {
@@ -7,12 +7,15 @@ import {
   removeTrackFromPlaylist,
   searchTracks,
 } from "../api";
-
+import { PlayerContext, SetPlayerContext } from "../PlayerContext.tsx";
 export function PlaylistView(props: {
   playlist: Playlist;
   setPlaylist: (playlist: Playlist) => void;
 }) {
   const { playlist, setPlaylist } = props;
+  const [shuffle, setShuffle] = useState(false);
+  const playerState = useContext(PlayerContext);
+  const setPlayerState = useContext(SetPlayerContext);
   const addTracksDialogRef = useRef<HTMLDialogElement>(null);
 
   return (
@@ -26,15 +29,139 @@ export function PlaylistView(props: {
       {/* header + list wrapper */}
       <div className="p-8 flex flex-col flex-1 min-h-0">
         {/* playlist header */}
-        <div className="flex gap-6 mb-8 bg-yellow-300 p-4 border-r-8 border-b-8 border-t-4 border-l-4 border-black">
+        <div className="mb-8 flex gap-6 bg-yellow-300 p-4 border-r-8 border-b-8 border-t-4 border-l-4 border-black">
           <img
             src={playlist.image_url}
             alt={playlist.name}
             className="w-48 h-48 object-cover"
           />
-          <div>
-            <h1 className="text-5xl font-bold">{playlist.name}</h1>
-            <p className="mt-4 text-lg">{playlist.description}</p>
+          <div className="flex flex-col w-full justify-between">
+            <div>
+              <h1 className="text-5xl font-bold">{playlist.name}</h1>
+              <p className="mt-4 text-lg">{playlist.description}</p>
+            </div>
+            <div className="flex flex-row gap-4 items-center">
+              <div className="flex flex-col justify-center items-center">
+                <button
+                  onClick={() => {
+                    setShuffle(!shuffle);
+                    if (
+                      !shuffle &&
+                      playerState.fromPlaylist?.id === playlist.id
+                    ) {
+                      // reshuffle current queue
+                      const newQueue = shuffleTracks([
+                        ...playerState.queuedTracks,
+                      ]);
+                      setPlayerState({
+                        ...playerState,
+                        queuedTracks: newQueue,
+                        shuffle: true,
+                      });
+                    }
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={shuffle ? "#2b7fff" : "#000"}
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="m18 14 4 4-4 4" />
+                    <path d="m18 2 4 4-4 4" />
+                    <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
+                    <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
+                    <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" />
+                  </svg>
+                </button>
+                {/* la indicator dot */}
+                {shuffle && (
+                  <div className="w-0 px-0.5 py-0.5 bg-[#2b7fff] rounded-full"></div>
+                )}
+              </div>
+              <button
+                className="bg-[#bfdbff] px-2 py-2 rounded-full border-t-2 border-l-2 border-r-6 border-b-6 border-black font-bold"
+                onClick={() => {
+                  if (playlist.tracks.length === 0) return;
+                  if (playerState.fromPlaylist?.id === playlist.id) {
+                    if (!playerState.isPlaying) {
+                      // if paused, play
+                      const queue = playerState.queuedTracks.concat(
+                        playlist.tracks.filter(
+                          (track) =>
+                            !playerState.queuedTracks.includes(track) &&
+                            track.track_id !==
+                              playerState.currentTrack?.track_id
+                        )
+                      ); // add rest of tracks to queue
+                      setPlayerState({
+                        ...playerState,
+                        isPlaying: true,
+                        queuedTracks: shuffle ? shuffleTracks(queue) : queue,
+                      });
+                    } else {
+                      // if playing, pause
+                      setPlayerState({
+                        ...playerState,
+                        isPlaying: false,
+                      });
+                    }
+                    return;
+                  }
+                  const queue = shuffle
+                    ? shuffleTracks(playlist.tracks)
+                    : playlist.tracks;
+                  setPlayerState({
+                    currentTrack: queue[0],
+                    isPlaying: true,
+                    currentTime: 0,
+                    duration: queue[0].duration,
+                    queuedTracks: queue.slice(1),
+                    repeat: "off",
+                    previousTracks: [],
+                    fromPlaylist: playlist,
+                    shuffle: shuffle,
+                  });
+                }}
+              >
+                {playerState.isPlaying &&
+                playerState.fromPlaylist?.id === playlist.id ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#000"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect x="14" y="3" width="5" height="18" rx="1" />
+                    <rect x="5" y="3" width="5" height="18" rx="1" />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#000"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -136,4 +263,13 @@ function SearchDialog(props: {
       </div>
     </dialog>
   );
+}
+
+function shuffleTracks<T>(array: T[]): T[] {
+  const shuffledArray = array.slice(); // create a copy of the original array
+  for (let i = shuffledArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledArray[i], shuffledArray[j]] = [shuffledArray[j], shuffledArray[i]];
+  }
+  return shuffledArray;
 }

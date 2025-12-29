@@ -1,7 +1,17 @@
 import { createContext } from "react";
-import type { Track } from "./types";
+import type { PlayerState } from "./types";
 
-export const PlayerTrackContext = createContext<Track | null>(null);
-export const SetPlayerTrackContext = createContext<
-  React.Dispatch<React.SetStateAction<Track | null>>
+export const PlayerContext = createContext<PlayerState>({
+  repeat: "off",
+  currentTrack: null,
+  isPlaying: false,
+  currentTime: 0,
+  duration: 0,
+  queuedTracks: [],
+  previousTracks: [],
+  fromPlaylist: null,
+  shuffle: false,
+});
+export const SetPlayerContext = createContext<
+  React.Dispatch<React.SetStateAction<PlayerState>>
 >(() => {});

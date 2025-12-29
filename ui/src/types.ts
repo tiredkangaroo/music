@@ -24,3 +24,15 @@ export interface PlaylistHead {
 export interface Playlist extends PlaylistHead {
   tracks: Track[];
 }
+
+export interface PlayerState {
+  currentTrack: Track | null;
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  queuedTracks: Track[];
+  previousTracks: Track[];
+  repeat: "off" | "one" | "all";
+  fromPlaylist: Playlist | null;
+  shuffle: boolean;
+}

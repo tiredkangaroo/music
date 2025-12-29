@@ -1,16 +1,26 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import type { Playlist, PlaylistHead, Track } from "./types";
+import type { PlayerState, Playlist, PlaylistHead, Track } from "./types";
 import { getPlaylist, listPlaylists, playTrack } from "./api";
 import { PlaylistHeadView } from "./components/PlaylistHead";
 import { PlaylistView } from "./components/Playlist";
-import { PlayerTrackContext, SetPlayerTrackContext } from "./PlayerContext";
+import { PlayerContext, SetPlayerContext } from "./PlayerContext";
 
 export default function App() {
   const [playlists, setPlaylists] = useState<PlaylistHead[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(
     null
   );
-  const [playerTrack, setPlayerTrack] = useState<Track | null>(null);
+  const [playerState, setPlayerState] = useState<PlayerState>({
+    currentTrack: null,
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0,
+    queuedTracks: [],
+    repeat: "off",
+    previousTracks: [],
+    fromPlaylist: null,
+    shuffle: false,
+  });
 
   // fetch playlists
   useEffect(() => {
@@ -21,8 +31,8 @@ export default function App() {
   }
 
   return (
-    <PlayerTrackContext.Provider value={playerTrack}>
-      <SetPlayerTrackContext.Provider value={setPlayerTrack}>
+    <PlayerContext.Provider value={playerState}>
+      <SetPlayerContext.Provider value={setPlayerState}>
         <div className="min-h-screen font-mono bg-[#edf5ff] flex flex-col md:flex-row w-full h-full">
           {/* the sidebar thing */}
           <div className="md:w-[25%] w-full md:h-full h-fit bg-white md:border-r-8 md:border-t-8 md:border-r-black px-2 py-4">
@@ -65,8 +75,8 @@ export default function App() {
             }}
           />
         </div>
-      </SetPlayerTrackContext.Provider>
-    </PlayerTrackContext.Provider>
+      </SetPlayerContext.Provider>
+    </PlayerContext.Provider>
   );
 }
 
@@ -89,7 +99,8 @@ function MainContent(props: {
 }
 
 function Player() {
-  const playerTrack = useContext(PlayerTrackContext);
+  const playerState = useContext(PlayerContext);
+  const setPlayerState = useContext(SetPlayerContext);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -113,7 +124,40 @@ function Player() {
     };
   }, [audioRef.current]);
 
-  if (!playerTrack) return <></>;
+  useEffect(() => {
+    console.log(playing, currentTime, duration);
+    if (playerState.isPlaying && currentTime === duration && duration > 0) {
+      // track ended
+      if (playerState.queuedTracks.length > 0) {
+        const nextTrack = playerState.queuedTracks[0];
+        const newQueue = playerState.queuedTracks.slice(1);
+        const newPrevious = playerState.previousTracks.concat([
+          playerState.currentTrack!,
+        ]);
+        setPlayerState({
+          currentTrack: nextTrack,
+          isPlaying: true,
+          currentTime: 0,
+          duration: nextTrack.duration,
+          queuedTracks: newQueue,
+          previousTracks: newPrevious,
+          repeat: playerState.repeat,
+          fromPlaylist: playerState.fromPlaylist,
+          shuffle: playerState.shuffle,
+        });
+      }
+    }
+  }, [playing, currentTime, duration]);
+
+  useEffect(() => {
+    if (playerState.isPlaying) {
+      audioRef.current?.play();
+    } else {
+      audioRef.current?.pause();
+    }
+  }, [playerState]);
+
+  if (!playerState.currentTrack) return <></>;
   return (
     <div
       className="relative h-[12%] min-h-fit border-t-8 border-black bg-white flex flex-row items-center px-4 py-2 gap-4"
@@ -121,7 +165,7 @@ function Player() {
     >
       <div className="h-full">
         <img
-          src={playerTrack.cover_url}
+          src={playerState.currentTrack.cover_url}
           className="h-full w-full object-cover"
         />
         {isWaiting && (
@@ -131,11 +175,50 @@ function Player() {
         )}
       </div>
       <div className="w-[20%] wrap-break-word">
-        <h2 className="font-semibold">{playerTrack.track_name}</h2>
-        <p className="font-light">{playerTrack.artists.join(", ")}</p>
+        <h2 className="font-semibold">{playerState.currentTrack.track_name}</h2>
+        <p className="font-light">
+          {playerState.currentTrack.artists.join(", ")}
+        </p>
       </div>
       <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-6">
-        <button className="text-2xl hover:scale-110 transition">
+        <button
+          className="text-2xl hover:scale-110 transition"
+          onClick={() => {
+            // prev
+            if (currentTime > 3) {
+              // restart track
+              if (audioRef.current) {
+                audioRef.current.currentTime = 0;
+                setCurrentTime(0);
+              }
+              return;
+            }
+            const nextTrack = playerState.previousTracks.at(-1);
+            if (!nextTrack) {
+              if (audioRef.current) {
+                audioRef.current.currentTime = 0;
+                setCurrentTime(0);
+              }
+              return;
+            }
+            const newPrevious = playerState.previousTracks.slice(0, -1); // remove last
+            const newQueue = [
+              playerState.currentTrack!,
+              ...playerState.queuedTracks,
+            ]; // add current to front of queue
+            setPlayerState({
+              currentTrack: nextTrack,
+              isPlaying: true,
+              currentTime: 0,
+              duration: nextTrack.duration,
+              queuedTracks: newQueue,
+              previousTracks: newPrevious,
+              repeat: playerState.repeat,
+              fromPlaylist: playerState.fromPlaylist,
+              shuffle: playerState.shuffle,
+            });
+          }}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="24"
@@ -157,8 +240,16 @@ function Player() {
             if (audioRef.current) {
               if (audioRef.current.paused) {
                 audioRef.current.play();
+                setPlayerState({
+                  ...playerState,
+                  isPlaying: true,
+                });
               } else {
                 audioRef.current.pause();
+                setPlayerState({
+                  ...playerState,
+                  isPlaying: false,
+                });
               }
             }
           }}
@@ -194,7 +285,28 @@ function Player() {
             </svg>
           )}
         </button>
-        <button className="text-2xl hover:scale-110 transition">
+        <button
+          className="text-2xl hover:scale-110 transition"
+          onClick={() => {
+            // skip
+            const nextTrack = playerState.queuedTracks[0];
+            const newPrevious = playerState.previousTracks.concat([
+              playerState.currentTrack!,
+            ]);
+            const newQueue = playerState.queuedTracks.slice(1);
+            setPlayerState({
+              currentTrack: nextTrack,
+              isPlaying: true,
+              currentTime: 0,
+              duration: nextTrack.duration,
+              queuedTracks: newQueue,
+              previousTracks: newPrevious,
+              repeat: playerState.repeat,
+              fromPlaylist: playerState.fromPlaylist,
+              shuffle: playerState.shuffle,
+            });
+          }}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="24"
@@ -211,7 +323,7 @@ function Player() {
           </svg>
         </button>
         <audio
-          src={playTrack(playerTrack.track_id)}
+          src={playTrack(playerState.currentTrack.track_id)}
           className="hidden"
           ref={audioRef}
           autoPlay
