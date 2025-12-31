@@ -225,10 +225,11 @@ func (q *Queries) ListPlaylists(ctx context.Context) ([]Playlist, error) {
 	return items, nil
 }
 
-const recordPlay = `-- name: RecordPlay :exec
+const recordPlay = `-- name: RecordPlay :one
 INSERT INTO plays (track_id, played_at, skipped_at)
 VALUES ($1, $2, $3)
 ON CONFLICT (track_id, played_at) DO NOTHING
+RETURNING play_id
 `
 
 type RecordPlayParams struct {
@@ -237,25 +238,26 @@ type RecordPlayParams struct {
 	SkippedAt pgtype.Int4      `json:"skipped_at"`
 }
 
-func (q *Queries) RecordPlay(ctx context.Context, arg RecordPlayParams) error {
-	_, err := q.db.Exec(ctx, recordPlay, arg.TrackID, arg.PlayedAt, arg.SkippedAt)
-	return err
+func (q *Queries) RecordPlay(ctx context.Context, arg RecordPlayParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, recordPlay, arg.TrackID, arg.PlayedAt, arg.SkippedAt)
+	var play_id pgtype.UUID
+	err := row.Scan(&play_id)
+	return play_id, err
 }
 
 const recordSkip = `-- name: RecordSkip :exec
 UPDATE plays
 SET skipped_at = $1
-WHERE track_id = $2 AND played_at = $3
+WHERE play_id = $2
 `
 
 type RecordSkipParams struct {
-	SkippedAt pgtype.Int4      `json:"skipped_at"`
-	TrackID   string           `json:"track_id"`
-	PlayedAt  pgtype.Timestamp `json:"played_at"`
+	SkippedAt pgtype.Int4 `json:"skipped_at"`
+	PlayID    pgtype.UUID `json:"play_id"`
 }
 
 func (q *Queries) RecordSkip(ctx context.Context, arg RecordSkipParams) error {
-	_, err := q.db.Exec(ctx, recordSkip, arg.SkippedAt, arg.TrackID, arg.PlayedAt)
+	_, err := q.db.Exec(ctx, recordSkip, arg.SkippedAt, arg.PlayID)
 	return err
 }
 

@@ -22,6 +22,7 @@ type Artist struct {
 }
 
 type Play struct {
+	PlayID    pgtype.UUID      `json:"play_id"`
 	TrackID   string           `json:"track_id"`
 	PlayedAt  pgtype.Timestamp `json:"played_at"`
 	SkippedAt pgtype.Int4      `json:"skipped_at"`

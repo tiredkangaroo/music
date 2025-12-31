@@ -35,4 +35,5 @@ export interface PlayerState {
   repeat: "off" | "one" | "all";
   fromPlaylist: Playlist | null;
   shuffle: boolean;
+  playID: string | null;
 }

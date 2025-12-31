@@ -27,11 +27,12 @@ export async function createPlaylist(
   description: string,
   image_url: string
 ) {
-  await fetch(`${API_BASE}/playlists`, {
+  const res = await fetch(`${API_BASE}/playlists`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, description, image_url }),
   });
+  return res.json();
 }
 
 export async function deletePlaylist(id: string) {
@@ -53,4 +54,36 @@ export async function removeTrackFromPlaylist(
   await fetch(`${API_BASE}/playlists/${playlistID}/tracks/${trackID}`, {
     method: "DELETE",
   });
+}
+
+export async function uploadImage(file: File): Promise<string> {
+  // file is uploaded as a form in the body named image
+  const res = await fetch(`${API_BASE}/images`, {
+    method: "POST",
+    body: (() => {
+      const formData = new FormData();
+      formData.append("image", file);
+      return formData;
+    })(),
+  });
+  if (!res.ok) throw new Error("image upload failed");
+  const data = await res.json();
+  return data.image_url as string;
+}
+
+export async function recordPlay(trackID: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/record/play/${trackID}`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("record play failed");
+  const data = await res.json();
+  return data.play_id as string;
+}
+export async function recordSkip(playID: string, skippedAt: number) {
+  const res = await fetch(`${API_BASE}/record/skip/${playID}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ skipped_at: skippedAt }),
+  });
+  if (!res.ok) throw new Error("record skip failed");
 }

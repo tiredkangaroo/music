@@ -3,7 +3,10 @@ import type { Playlist, Track } from "../types";
 import { TrackView } from "./Track";
 import {
   addTrackToPlaylist,
+  deletePlaylist,
   getPlaylist,
+  recordPlay,
+  recordSkip,
   removeTrackFromPlaylist,
   searchTracks,
 } from "../api";
@@ -86,7 +89,7 @@ export function PlaylistView(props: {
               </div>
               <button
                 className="bg-[#bfdbff] px-2 py-2 rounded-full border-t-2 border-l-2 border-r-6 border-b-6 border-black font-bold"
-                onClick={() => {
+                onClick={async () => {
                   if (playlist.tracks.length === 0) return;
                   if (playerState.fromPlaylist?.id === playlist.id) {
                     if (!playerState.isPlaying) {
@@ -113,9 +116,18 @@ export function PlaylistView(props: {
                     }
                     return;
                   }
+                  if (playerState.currentTrack?.track_id !== null) {
+                    console.log("recording skip before playing new playlist");
+                    recordSkip(playerState.playID!, playerState.currentTime);
+                  }
                   const queue = shuffle
                     ? shuffleTracks(playlist.tracks)
                     : playlist.tracks;
+                  const playID = await recordPlay(queue[0].track_id);
+                  console.log(
+                    "recording play as a result of clicking play playlist",
+                    playID
+                  );
                   setPlayerState({
                     currentTrack: queue[0],
                     isPlaying: true,
@@ -126,6 +138,7 @@ export function PlaylistView(props: {
                     previousTracks: [],
                     fromPlaylist: playlist,
                     shuffle: shuffle,
+                    playID: null,
                   });
                 }}
               >
@@ -160,6 +173,38 @@ export function PlaylistView(props: {
                     <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
                   </svg>
                 )}
+              </button>
+              <button
+                onClick={() => {
+                  //  ask are you sure?
+                  const confirmed = confirm(
+                    "Are you sure you want to delete this playlist? This action cannot be undone."
+                  );
+                  if (!confirmed) return;
+                  // user confirmed, delete playlist
+                  deletePlaylist(playlist.id);
+                  setPlaylist(null as unknown as Playlist);
+                  // note: i wonder what happens to the player if the playlist being played is deleted.
+                  // the queue should remain intact, but fromPlaylist will reference a deleted playlist.
+                }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#ff0000"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
               </button>
             </div>
           </div>

@@ -1,9 +1,10 @@
-import { useContext, useEffect, useRef, useState } from "react";
-import type { PlayerState, Playlist, PlaylistHead, Track } from "./types";
-import { getPlaylist, listPlaylists, playTrack } from "./api";
+import { useEffect, useReducer, useRef, useState } from "react";
+import type { PlayerState, Playlist, PlaylistHead } from "./types";
+import { createPlaylist, getPlaylist, listPlaylists, uploadImage } from "./api";
 import { PlaylistHeadView } from "./components/PlaylistHead";
 import { PlaylistView } from "./components/Playlist";
 import { PlayerContext, SetPlayerContext } from "./PlayerContext";
+import { Player } from "./components/Player";
 
 export default function App() {
   const [playlists, setPlaylists] = useState<PlaylistHead[]>([]);
@@ -20,6 +21,7 @@ export default function App() {
     previousTracks: [],
     fromPlaylist: null,
     shuffle: false,
+    playID: null,
   });
 
   // fetch playlists
@@ -34,31 +36,24 @@ export default function App() {
     <PlayerContext.Provider value={playerState}>
       <SetPlayerContext.Provider value={setPlayerState}>
         <div className="min-h-screen font-mono bg-[#edf5ff] flex flex-col md:flex-row w-full h-full">
-          {/* the sidebar thing */}
-          <div className="md:w-[25%] w-full md:h-full h-fit bg-white md:border-r-8 md:border-t-8 md:border-r-black px-2 py-4">
-            <div className="w-full flex md:flex-row flex-col md:justify-between gap-4">
-              <h1 className="text-4xl">Library</h1>
-              <button className="text-2xl font-bold py-1 px-3 bg-[#bfdbff] border-black border-t-2 border-l-2 border-r-4 border-4">
-                +
-              </button>
-            </div>
-            <div className="mt-4 flex flex-row gap-4">
-              {playlists.map((playlist) => (
-                <div
-                  className="w-full"
-                  onClick={() => selectPlaylist(playlist.id)}
-                  key={playlist.id}
-                >
-                  <PlaylistHeadView playlist={playlist} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* main content area */}
+          <Sidebar
+            playlists={playlists}
+            setPlaylists={setPlaylists}
+            selectPlaylist={selectPlaylist}
+          />
           <MainContent
             playlist={selectedPlaylist}
             setPlaylist={(p) => {
+              if (p === null) {
+                setSelectedPlaylist(null); // clear selected playlist
+                const updatedPlaylists = [...playlists].filter(
+                  // remove deleted playlist
+                  (pl) => pl.id !== selectedPlaylist?.id
+                );
+                setPlaylists(updatedPlaylists);
+                return;
+              }
+              // update playlist details
               setSelectedPlaylist(p);
               const updatedPlaylists = [...playlists];
               const index = updatedPlaylists.findIndex((pl) => pl.id === p.id);
@@ -80,181 +75,116 @@ export default function App() {
   );
 }
 
-function MainContent(props: {
-  playlist: Playlist | null;
-  setPlaylist: (playlist: Playlist) => void;
+function Sidebar(props: {
+  playlists: PlaylistHead[];
+  setPlaylists: React.Dispatch<React.SetStateAction<PlaylistHead[]>>;
+  selectPlaylist: (id: string) => void;
 }) {
-  const { playlist } = props;
-  if (!playlist) {
-    return <></>;
-  }
+  const { playlists, setPlaylists, selectPlaylist } = props;
+  const newPlaylistDialogRef = useRef<HTMLDialogElement>(null);
+
   return (
-    <div className="flex flex-col w-full h-screen">
-      <div className="flex-1 min-h-0">
-        <PlaylistView playlist={playlist} setPlaylist={props.setPlaylist} />
+    <div className="md:w-[18%] w-full md:h-full h-fit bg-white md:border-r-8 md:border-t-8 md:border-r-black px-2 py-4">
+      <NewPlaylistDialog
+        playlists={playlists}
+        setPlaylists={setPlaylists}
+        newPlaylistDialogRef={newPlaylistDialogRef}
+        setSelectedPlaylist={props.selectPlaylist}
+      />
+      <div className="w-full flex md:flex-col flex-col md:justify-between gap-4">
+        <h1 className="text-4xl">Library</h1>
+        <button
+          className="text-2xl font-bold py-1 px-3 bg-[#bfdbff] border-black border-t-2 border-l-2 border-r-4 border-4"
+          onClick={() => newPlaylistDialogRef.current?.showModal()}
+        >
+          +
+        </button>
       </div>
-      <Player />
+      <div className="mt-4 flex flex-col gap-4 overflow-y-auto h-[80vh] px-6">
+        {playlists.map((playlist) => (
+          <div
+            className="w-full"
+            onClick={() => selectPlaylist(playlist.id)}
+            key={playlist.id}
+          >
+            <PlaylistHeadView playlist={playlist} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-function Player() {
-  const playerState = useContext(PlayerContext);
-  const setPlayerState = useContext(SetPlayerContext);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [playing, setPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isWaiting, setIsWaiting] = useState(true);
+function NewPlaylistDialog(props: {
+  newPlaylistDialogRef: React.RefObject<HTMLDialogElement | null>;
+  playlists: PlaylistHead[];
+  setPlaylists: React.Dispatch<React.SetStateAction<PlaylistHead[]>>;
+  setSelectedPlaylist: (id: string) => void;
+}) {
+  const { newPlaylistDialogRef, playlists, setPlaylists, setSelectedPlaylist } =
+    props;
+  const newPlaylistImageRef = useRef<HTMLInputElement>(null);
+  const newPlaylistImageContainerRef = useRef<HTMLDivElement>(null);
+  const newPlaylistNameRef = useRef<HTMLInputElement>(null);
+  const newPlaylistDescriptionRef = useRef<HTMLTextAreaElement>(null);
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    const onWaiting = () => setIsWaiting(true);
-    const onPlaying = () => setIsWaiting(false);
-
-    audioRef.current.addEventListener("waiting", onWaiting);
-    audioRef.current.addEventListener("playing", onPlaying);
-    audioRef.current.addEventListener("canplay", onPlaying);
-
-    return () => {
-      audioRef.current?.removeEventListener("waiting", onWaiting);
-      audioRef.current?.removeEventListener("playing", onPlaying);
-      audioRef.current?.removeEventListener("canplay", onPlaying);
-    };
-  }, [audioRef.current]);
-
-  useEffect(() => {
-    console.log(playing, currentTime, duration);
-    if (playerState.isPlaying && currentTime === duration && duration > 0) {
-      // track ended
-      if (playerState.queuedTracks.length > 0) {
-        const nextTrack = playerState.queuedTracks[0];
-        const newQueue = playerState.queuedTracks.slice(1);
-        const newPrevious = playerState.previousTracks.concat([
-          playerState.currentTrack!,
-        ]);
-        setPlayerState({
-          currentTrack: nextTrack,
-          isPlaying: true,
-          currentTime: 0,
-          duration: nextTrack.duration,
-          queuedTracks: newQueue,
-          previousTracks: newPrevious,
-          repeat: playerState.repeat,
-          fromPlaylist: playerState.fromPlaylist,
-          shuffle: playerState.shuffle,
-        });
-      }
+  async function handleCreatePlaylist() {
+    const name = newPlaylistNameRef.current?.value.trim() || "";
+    const description = newPlaylistDescriptionRef.current?.value.trim() || "";
+    if (name === "") {
+      setErrorMessage("playlist name cannot be empty");
+      return;
     }
-  }, [playing, currentTime, duration]);
-
-  useEffect(() => {
-    if (playerState.isPlaying) {
-      audioRef.current?.play();
-    } else {
-      audioRef.current?.pause();
+    if (description === "") {
+      setErrorMessage("playlist description cannot be empty");
+      return;
     }
-  }, [playerState]);
+    const imageFile = newPlaylistImageRef.current?.files?.[0];
+    if (!imageFile) {
+      setErrorMessage("please upload a playlist image");
+      return;
+    }
 
-  if (!playerState.currentTrack) return <></>;
+    // upload image as binary and get URL
+    const imageURL = await uploadImage(imageFile);
+    console.log("uploaded image", imageURL);
+
+    createPlaylist(name, description, imageURL).then((resp) => {
+      const newPlaylistID = resp.playlist_id as string;
+      setPlaylists([
+        {
+          id: newPlaylistID,
+          name: name,
+          description: description,
+          image_url: imageURL,
+          created_at: new Date().toISOString(),
+        },
+        ...playlists,
+      ]);
+      newPlaylistNameRef.current!.value = "";
+      newPlaylistDescriptionRef.current!.value = "";
+      newPlaylistImageContainerRef.current!.style.backgroundImage = "";
+      newPlaylistImageContainerRef.current!.style.border = "2px solid black";
+      newPlaylistImageRef.current!.value = "";
+      setErrorMessage("");
+      setSelectedPlaylist(newPlaylistID);
+      newPlaylistDialogRef.current?.close();
+    });
+  }
   return (
-    <div
-      className="relative h-[12%] min-h-fit border-t-8 border-black bg-white flex flex-row items-center px-4 py-2 gap-4"
-      inert={isWaiting}
+    <dialog
+      ref={newPlaylistDialogRef}
+      id="new-playlist-dialog"
+      className="m-auto"
     >
-      <div className="h-full">
-        <img
-          src={playerState.currentTrack.cover_url}
-          className="h-full w-full object-cover"
-        />
-        {isWaiting && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80 pointer-events-auto">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-white" />
-          </div>
-        )}
-      </div>
-      <div className="w-[20%] wrap-break-word">
-        <h2 className="font-semibold">{playerState.currentTrack.track_name}</h2>
-        <p className="font-light">
-          {playerState.currentTrack.artists.join(", ")}
-        </p>
-      </div>
-      <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-6">
-        <button
-          className="text-2xl hover:scale-110 transition"
-          onClick={() => {
-            // prev
-            if (currentTime > 3) {
-              // restart track
-              if (audioRef.current) {
-                audioRef.current.currentTime = 0;
-                setCurrentTime(0);
-              }
-              return;
-            }
-            const nextTrack = playerState.previousTracks.at(-1);
-            if (!nextTrack) {
-              if (audioRef.current) {
-                audioRef.current.currentTime = 0;
-                setCurrentTime(0);
-              }
-              return;
-            }
-            const newPrevious = playerState.previousTracks.slice(0, -1); // remove last
-            const newQueue = [
-              playerState.currentTrack!,
-              ...playerState.queuedTracks,
-            ]; // add current to front of queue
-            setPlayerState({
-              currentTrack: nextTrack,
-              isPlaying: true,
-              currentTime: 0,
-              duration: nextTrack.duration,
-              queuedTracks: newQueue,
-              previousTracks: newPrevious,
-              repeat: playerState.repeat,
-              fromPlaylist: playerState.fromPlaylist,
-              shuffle: playerState.shuffle,
-            });
-          }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#000000"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+      <div className="md:w-[60vw] min-w-fit h-fit md:min-h-96 py-4 px-4 flex flex-col gap-4">
+        <div className="flex flex-row justify-between items-center">
+          <h1 className="text-3xl font-bold">New Playlist</h1>
+          <button
+            className="font-bold"
+            onClick={() => newPlaylistDialogRef.current?.close()}
           >
-            <path d="M17.971 4.285A2 2 0 0 1 21 6v12a2 2 0 0 1-3.029 1.715l-9.997-5.998a2 2 0 0 1-.003-3.432z" />
-            <path d="M3 20V4" />
-          </svg>
-        </button>
-        <button
-          className="text-3xl hover:scale-110 transition"
-          onClick={() => {
-            if (audioRef.current) {
-              if (audioRef.current.paused) {
-                audioRef.current.play();
-                setPlayerState({
-                  ...playerState,
-                  isPlaying: true,
-                });
-              } else {
-                audioRef.current.pause();
-                setPlayerState({
-                  ...playerState,
-                  isPlaying: false,
-                });
-              }
-            }
-          }}
-        >
-          {playing ? (
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"
@@ -266,103 +196,150 @@ function Player() {
               stroke-linecap="round"
               stroke-linejoin="round"
             >
-              <rect x="14" y="3" width="5" height="18" rx="1" />
-              <rect x="5" y="3" width="5" height="18" rx="1" />
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
             </svg>
-          ) : (
+          </button>
+        </div>
+        {errorMessage && (
+          <div className="w-full p-2 bg-red-200 border-2 border-red-600 text-red-800 flex flex-row justify-between items-center">
+            <p>error: {errorMessage}</p>
+            <button className="font-bold" onClick={() => setErrorMessage("")}>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        <div className="flex md:flex-row flex-col w-full h-full gap-6 items-center">
+          {/* image upload for playlist cover         */}
+          <div
+            className="shrink-0 w-64 h-64 border-r-8 border-b-8 border-l-2 border-t-2 border-black text-[#00000000] hover:bg-[#c9c9c9] hover:text-black flex items-center justify-center"
+            onClick={() => {
+              newPlaylistImageRef.current!.click();
+            }}
+            ref={newPlaylistImageContainerRef}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
+              className="w-1/2 h-1/2"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             >
-              <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
+              <path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z" />
+              <circle cx="12" cy="13" r="3" />
             </svg>
-          )}
-        </button>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              multiple={false}
+              ref={newPlaylistImageRef}
+              onInput={(event) => {
+                const input = event.target as HTMLInputElement;
+                if (input.files && input.files[0]) {
+                  const file = input.files[0];
+                  // check if image is larger than 5MB
+                  if (file.size > 5 * 1024 * 1024) {
+                    setErrorMessage("image size should be less than 5MB");
+                    input.value = "";
+                    return;
+                  }
+                  // check if image is square
+                  const img = new Image();
+                  img.src = URL.createObjectURL(file);
+                  img.onload = () => {
+                    if (img.width !== img.height) {
+                      setErrorMessage("image should be square");
+                      input.value = "";
+                      return;
+                    }
+                    if (img.width < 300 || img.height < 300) {
+                      setErrorMessage(
+                        "image dimensions should be at least 300x300 pixels"
+                      );
+                      input.value = "";
+                      return;
+                    }
+
+                    // display image preview (validations passed)
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                      if (newPlaylistImageContainerRef.current) {
+                        newPlaylistImageContainerRef.current.style.backgroundImage = `url(${e.target?.result})`;
+                        newPlaylistImageContainerRef.current.style.backgroundSize =
+                          "cover";
+                        newPlaylistImageContainerRef.current.style.backgroundPosition =
+                          "center";
+                        newPlaylistImageContainerRef.current.style.border =
+                          "none";
+                      }
+                    };
+                    reader.readAsDataURL(file);
+                  };
+                }
+              }}
+            ></input>
+          </div>
+          <div className="w-full pr-4">
+            <input
+              className="p-2 border border-black w-full"
+              placeholder="Playlist Name"
+              ref={newPlaylistNameRef}
+            ></input>
+            <textarea
+              className="p-2 border border-black w-full mt-4 resize-none"
+              placeholder="Playlist Description"
+              rows={4}
+              ref={newPlaylistDescriptionRef}
+            ></textarea>
+          </div>
+        </div>
         <button
-          className="text-2xl hover:scale-110 transition"
-          onClick={() => {
-            // skip
-            const nextTrack = playerState.queuedTracks[0];
-            const newPrevious = playerState.previousTracks.concat([
-              playerState.currentTrack!,
-            ]);
-            const newQueue = playerState.queuedTracks.slice(1);
-            setPlayerState({
-              currentTrack: nextTrack,
-              isPlaying: true,
-              currentTime: 0,
-              duration: nextTrack.duration,
-              queuedTracks: newQueue,
-              previousTracks: newPrevious,
-              repeat: playerState.repeat,
-              fromPlaylist: playerState.fromPlaylist,
-              shuffle: playerState.shuffle,
-            });
-          }}
+          className="bg-blue-500 text-white px-4 py-2 rounded"
+          onClick={handleCreatePlaylist}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#000000"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M21 4v16" />
-            <path d="M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z" />
-          </svg>
+          Create
         </button>
-        <audio
-          src={playTrack(playerState.currentTrack.track_id)}
-          className="hidden"
-          ref={audioRef}
-          autoPlay
-          onPause={() => setPlaying(false)}
-          onPlay={() => setPlaying(true)}
-          onTimeUpdate={(e) => {
-            setCurrentTime(e.currentTarget.currentTime);
-          }}
-          onLoadedMetadata={(e) => {
-            setDuration(e.currentTarget.duration);
-          }}
-        />
       </div>
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[45%] flex items-center gap-2">
-        <span className="text-xs w-10 text-right">
-          {Math.floor(currentTime / 60)}:
-          {String(Math.floor(currentTime % 60)).padStart(2, "0")}
-        </span>
+    </dialog>
+  );
+}
 
-        <input
-          type="range"
-          min={0}
-          max={duration || 0}
-          value={currentTime}
-          onChange={(e) => {
-            const time = Number(e.target.value);
-            if (audioRef.current) {
-              audioRef.current.currentTime = time;
-              setCurrentTime(time);
-            }
-          }}
-          className="flex-1 h-1 accent-black cursor-pointer"
-        />
-
-        <span className="text-xs w-10">
-          {Math.floor(duration / 60)}:
-          {String(Math.floor(duration % 60)).padStart(2, "0")}
-        </span>
+function MainContent(props: {
+  playlist: Playlist | null;
+  setPlaylist: (playlist: Playlist) => void;
+}) {
+  const { playlist } = props;
+  if (!playlist) {
+    return (
+      <div className="flex-1 flex flex-col justify-center items-center">
+        <h1 className="text-4xl font-bold">hi?!</h1>
       </div>
+    );
+  }
+  return (
+    <div className="flex flex-col w-full h-screen">
+      <div className="flex-1 min-h-0">
+        <PlaylistView playlist={playlist} setPlaylist={props.setPlaylist} />
+      </div>
+      <Player />
     </div>
   );
 }

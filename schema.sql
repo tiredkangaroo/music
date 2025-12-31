@@ -34,8 +34,8 @@ CREATE TABLE IF NOT EXISTS playlist_tracks (
 );
 
 CREATE TABLE IF NOT EXISTS plays (
+    play_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     track_id text NOT NULL REFERENCES tracks(track_id) ON DELETE CASCADE,
     played_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    skipped_at integer, -- can be NULL if not skipped, x second into the track when skipped
-    UNIQUE (track_id, played_at)
-)
+    skipped_at integer -- can be NULL if not skipped, x second into the track when skipped
+);

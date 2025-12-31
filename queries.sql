@@ -92,12 +92,13 @@ GROUP BY p.id;
 DELETE FROM playlist_tracks
 WHERE playlist_id = $1 AND track_id = $2;
 
--- name: RecordPlay :exec
+-- name: RecordPlay :one
 INSERT INTO plays (track_id, played_at, skipped_at)
 VALUES ($1, $2, $3)
-ON CONFLICT (track_id, played_at) DO NOTHING;
+ON CONFLICT (track_id, played_at) DO NOTHING
+RETURNING play_id;
 
 -- name: RecordSkip :exec
 UPDATE plays
 SET skipped_at = $1
-WHERE track_id = $2 AND played_at = $3;
+WHERE play_id = $2;

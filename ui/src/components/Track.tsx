@@ -1,19 +1,28 @@
 import { useContext } from "react";
 import type { Track } from "../types.ts";
 import { PlayerContext, SetPlayerContext } from "../PlayerContext.tsx";
+import { recordPlay, recordSkip } from "../api.ts";
 export function TrackView(props: {
   track: Track;
   addTrack?: () => void;
   removeTrack?: () => void;
 }) {
-  //   const playerState = useContext(PlayerContext);
+  const playerState = useContext(PlayerContext);
   const setPlayerState = useContext(SetPlayerContext);
   const { track } = props;
   return (
     <div
       className="p-4 border-t-3 border-l-3 border-r-6 border-b-6 border-gray-300 cursor-pointer"
       // play track on click (resetting the queue)
-      onClick={() =>
+      onClick={async () => {
+        if (playerState.currentTrack?.track_id === track.track_id) {
+          return;
+        } else if (playerState.currentTrack?.track_id !== null) {
+          console.log("recording skip before playing new track");
+          recordSkip(playerState.playID!, playerState.currentTime);
+        }
+        const playID = await recordPlay(track.track_id);
+        console.log("recording play as a result of clicking track", playID);
         setPlayerState({
           currentTrack: track,
           isPlaying: true,
@@ -25,8 +34,9 @@ export function TrackView(props: {
           previousTracks: [],
           fromPlaylist: null,
           shuffle: false,
-        })
-      }
+          playID: playID,
+        });
+      }}
     >
       <div className="flex flex-row justify-between items-center">
         <div className="flex flex-row gap-4 ">

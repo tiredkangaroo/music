@@ -191,7 +191,7 @@ func (l *Library) RemoveTrackFromPlaylist(ctx context.Context, playlistID, track
 }
 
 // Play returns a ReadCloser for the audio file for the specified track.
-// It also records the play in the database. If the file is not found in storage,
+// It does NOT record the play in the database. If the file is not found in storage,
 // it downloads the track before returning the ReadCloser.
 func (l *Library) Play(ctx context.Context, trackID string) (io.ReadCloser, error) {
 	// where older tracks may be deleted from storage for space management
@@ -200,7 +200,6 @@ func (l *Library) Play(ctx context.Context, trackID string) (io.ReadCloser, erro
 	p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
 	rd, err := os.Open(p)
 	if err == nil {
-		l.RecordPlay(ctx, trackID)
 		return rd, nil
 	}
 	if !os.IsNotExist(err) {
@@ -215,19 +214,19 @@ func (l *Library) Play(ctx context.Context, trackID string) (io.ReadCloser, erro
 }
 
 // RecordPlay records a play of the specified track in the database.
-func (l *Library) RecordPlay(ctx context.Context, trackID string) error {
-	return l.queries.RecordPlay(ctx, queries.RecordPlayParams{
+func (l *Library) RecordPlay(ctx context.Context, trackID string) (string, error) {
+	id, err := l.queries.RecordPlay(ctx, queries.RecordPlayParams{
 		TrackID:  trackID,
 		PlayedAt: opttime(time.Now()),
 	})
+	return id.String(), err
 }
 
 // RecordSkip records that the specified track was skipped at the given second.
-func (l *Library) RecordSkip(ctx context.Context, trackID string, playedAt time.Time, skippedAt int32) error {
+func (l *Library) RecordSkip(ctx context.Context, playID string, skippedAt int32) error {
 	return l.queries.RecordSkip(ctx, queries.RecordSkipParams{
-		TrackID:   trackID,
+		PlayID:    optuuid(uuid.MustParse(playID)),
 		SkippedAt: optint32(skippedAt),
-		PlayedAt:  opttime(playedAt),
 	})
 }
 

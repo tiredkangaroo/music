@@ -11,6 +11,8 @@ type Environment struct {
 	SpotifyClientID     string
 	SpotifyClientSecret string
 	ServerAddress       string
+	StorageURL          string
+	StorageAPISecret    string
 }
 
 var DefaultEnv = Environment{
@@ -19,11 +21,13 @@ var DefaultEnv = Environment{
 	SpotifyClientID:     os.Getenv("SPOTIFY_CLIENT_ID"),
 	SpotifyClientSecret: os.Getenv("SPOTIFY_CLIENT_SECRET"),
 	ServerAddress:       dv(os.Getenv("SERVER_ADDRESS"), ":8080"),
+	StorageURL:          dv(os.Getenv("STORAGE_URL"), "https://storage.mechanicaldinosaurs.net"),
+	StorageAPISecret:    os.Getenv("STORAGE_API_SECRET"),
 }
 
 // Init initializes the environment by checking required variables. It returns an error if any required variable is missing.
 func Init() error {
-	if DefaultEnv.PathToSpotDL == "" || DefaultEnv.SpotifyClientID == "" || DefaultEnv.SpotifyClientSecret == "" {
+	if DefaultEnv.PathToSpotDL == "" || DefaultEnv.SpotifyClientID == "" || DefaultEnv.SpotifyClientSecret == "" || DefaultEnv.StorageURL == "" || DefaultEnv.StorageAPISecret == "" {
 		return errors.New("one or more required environment variables are not set")
 	}
 	return nil

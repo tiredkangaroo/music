@@ -1,9 +1,17 @@
 package server
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"fmt"
+	"io"
+	"log/slog"
 	"mime"
 	"net/http"
+	"strconv"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/tiredkangaroo/music/db"
@@ -20,6 +28,7 @@ func (s *Server) Serve() error {
 	e.Use(middleware.RequestLogger())
 
 	if env.DefaultEnv.Debug {
+		slog.Info("debug mode enabled")
 		e.Use(middleware.CORS())
 	}
 
@@ -46,6 +55,33 @@ func (s *Server) Serve() error {
 		}
 		defer data.Close()
 		return c.Stream(http.StatusOK, mime.TypeByExtension(".m4a"), data)
+	})
+
+	e.POST("/record/play/:trackID", func(c echo.Context) error {
+		trackID := c.Param("trackID")
+		if trackID == "" {
+			return c.JSON(400, errormap("trackID parameter is required"))
+		}
+		id, err := s.lib.RecordPlay(c.Request().Context(), trackID)
+		if err != nil {
+			return c.JSON(500, errormap(err.Error()))
+		}
+		return c.JSON(200, map[string]string{"play_id": id})
+	})
+	e.POST("/record/skip/:playID", func(c echo.Context) error {
+		playID := c.Param("playID")
+		if playID == "" {
+			return c.JSON(400, errormap("playID parameter is required"))
+		}
+		atStr := c.QueryParam("at")
+		at, err := strconv.Atoi(atStr)
+		if err != nil {
+			return c.JSON(400, errormap("invalid 'at' parameter"))
+		}
+		if err := s.lib.RecordSkip(c.Request().Context(), playID, int32(at)); err != nil {
+			return c.JSON(500, errormap(err.Error()))
+		}
+		return c.JSON(200, nil)
 	})
 
 	e.GET("/playlists", func(c echo.Context) error {
@@ -115,6 +151,52 @@ func (s *Server) Serve() error {
 		return c.JSON(200, nil)
 	})
 
+	// store an image
+	e.POST("/images", func(c echo.Context) error {
+		file, err := c.FormFile("image")
+		if err != nil {
+			return c.JSON(400, errormap("image file is required"))
+		}
+		if file.Size > 5*1024*1024 { // 5 MB limit
+			return c.JSON(400, errormap("image file size exceeds 5 MB"))
+		}
+		switch file.Header.Get("Content-Type") {
+		case "image/jpeg", "image/png", "image/gif", "image/webp":
+		default:
+			return c.JSON(400, errormap("unsupported image format"))
+		}
+		src, err := file.Open()
+		if err != nil {
+			return c.JSON(500, errormap("internal server error"))
+		}
+		defer src.Close()
+
+		// call the storage api
+		req, err := http.NewRequestWithContext(c.Request().Context(), "POST", env.DefaultEnv.StorageURL+"/push", src)
+		if err != nil {
+			return c.JSON(500, errormap("internal server error"))
+		}
+		req.Header.Set("Content-Type", file.Header.Get("Content-Type"))
+		signRequest(req)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return c.JSON(500, errormap("internal server error"))
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusCreated {
+			slog.Error("store image", "status", resp.StatusCode)
+			return c.JSON(500, errormap("internal server error"))
+		}
+		data, err := io.ReadAll(resp.Body) // the body is the image key
+		if err != nil {
+			return c.JSON(500, errormap("internal server error"))
+		}
+		return c.JSON(200, map[string]string{"image_url": env.DefaultEnv.StorageURL + "/pull/" + string(data)})
+
+	})
+
 	return e.Start(env.DefaultEnv.ServerAddress)
 }
 
@@ -133,4 +215,18 @@ func bindreq[T any](handler func(c echo.Context, req T) error) echo.HandlerFunc 
 		}
 		return handler(c, req)
 	}
+}
+func signRequest(req *http.Request) {
+	uploadID := uuid.New().String()
+	timestamp := strconv.FormatInt(time.Now().UTC().Unix(), 10)
+
+	cs := uploadID + "\n" + timestamp
+	csh := hmac.New(sha256.New, []byte(env.DefaultEnv.StorageAPISecret))
+	csh.Write([]byte(cs))
+	csb := csh.Sum(nil)
+	csb_hex := fmt.Sprintf("%x", csb)
+
+	req.Header.Set("X-Upload-ID", uploadID)
+	req.Header.Set("X-Timestamp", timestamp)
+	req.Header.Set("X-Signature", csb_hex)
 }
