@@ -58,29 +58,32 @@ func (s *Server) Serve() error {
 	})
 
 	e.POST("/record/play/:trackID", func(c echo.Context) error {
-		trackID := c.Param("trackID")
-		if trackID == "" {
-			return c.JSON(400, errormap("trackID parameter is required"))
-		}
-		id, err := s.lib.RecordPlay(c.Request().Context(), trackID)
-		if err != nil {
-			return c.JSON(500, errormap(err.Error()))
-		}
-		return c.JSON(200, map[string]string{"play_id": id})
+		return c.JSON(200, map[string]string{
+			"play_id": "not-implemented",
+		})
+		// trackID := c.Param("trackID")
+		// if trackID == "" {
+		// 	return c.JSON(400, errormap("trackID parameter is required"))
+		// }
+		// id, err := s.lib.RecordPlay(c.Request().Context(), trackID)
+		// if err != nil {
+		// 	return c.JSON(500, errormap(err.Error()))
+		// }
+		// return c.JSON(200, map[string]string{"play_id": id})
 	})
 	e.POST("/record/skip/:playID", func(c echo.Context) error {
-		playID := c.Param("playID")
-		if playID == "" {
-			return c.JSON(400, errormap("playID parameter is required"))
-		}
-		atStr := c.QueryParam("at")
-		at, err := strconv.Atoi(atStr)
-		if err != nil {
-			return c.JSON(400, errormap("invalid 'at' parameter"))
-		}
-		if err := s.lib.RecordSkip(c.Request().Context(), playID, int32(at)); err != nil {
-			return c.JSON(500, errormap(err.Error()))
-		}
+		// playID := c.Param("playID")
+		// if playID == "" {
+		// 	return c.JSON(400, errormap("playID parameter is required"))
+		// }
+		// atStr := c.QueryParam("at")
+		// at, err := strconv.Atoi(atStr)
+		// if err != nil {
+		// 	return c.JSON(400, errormap("invalid 'at' parameter"))
+		// }
+		// if err := s.lib.RecordSkip(c.Request().Context(), playID, int32(at)); err != nil {
+		// 	return c.JSON(500, errormap(err.Error()))
+		// }
 		return c.JSON(200, nil)
 	})
 
