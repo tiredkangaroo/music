@@ -53,3 +53,35 @@ func insertParamsFromSearchRow(t queries.SearchTrackByNameRow) queries.InsertTra
 		Popularity: t.Popularity,
 	}
 }
+
+func insertParamsFromItem(item spotifyItem) queries.InsertTrackParams {
+	if len(item.Artists) == 0 {
+		return queries.InsertTrackParams{}
+	}
+	var artistNames []string
+	for _, artist := range item.Artists {
+		artistNames = append(artistNames, artist.Name)
+	}
+	var coverURL string
+	if len(item.Album.Images) > 0 {
+		coverURL = item.Album.Images[0].URL
+	}
+	rd := releaseDate(item.Album.ReleaseDate)
+	return queries.InsertTrackParams{
+		ArtistID:   item.Artists[0].ID,
+		ArtistName: item.Artists[0].Name,
+		Artists:    artistNames,
+
+		AlbumID:          item.Album.ID,
+		AlbumName:        item.Album.Name,
+		AlbumReleaseDate: rd,
+		CoverUrl:         coverURL,
+
+		TrackID:          item.ID,
+		TrackName:        item.Name,
+		TrackReleaseDate: rd,
+
+		Duration:   int32(item.DurationMs / 1000), // convert ms to s
+		Popularity: item.Popularity,
+	}
+}

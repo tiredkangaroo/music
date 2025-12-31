@@ -67,3 +67,23 @@ func (t *spotifyToken) getToken(ctx context.Context) error {
 	t.expiresAt = time.Now().Add(time.Duration(data.ExpiresIn) * time.Second)
 	return nil
 }
+
+type spotifyItems []spotifyItem
+type spotifyItem struct {
+	Album struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		ReleaseDate string `json:"release_date"`
+		Images      []struct {
+			URL string `json:"url"`
+		} `json:"images"`
+	} `json:"album"`
+	Artists []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"artists"`
+	DurationMs int    `json:"duration_ms"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Popularity int32  `json:"popularity"`
+}

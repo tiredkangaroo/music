@@ -111,6 +111,10 @@ func (s *Server) Serve() error {
 		return c.JSON(200, map[string]string{"playlist_id": playlistID})
 	}))
 
+	// e.POST("/import", func(c echo.Context) error {
+
+	// })
+
 	// delete playlist
 	e.DELETE("/playlists/:playlistID", func(c echo.Context) error {
 		playlistID := c.Param("playlistID")

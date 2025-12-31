@@ -274,24 +274,7 @@ func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTra
 
 	var data struct {
 		Tracks struct {
-			Items []struct {
-				Album struct {
-					ID          string `json:"id"`
-					Name        string `json:"name"`
-					ReleaseDate string `json:"release_date"`
-					Images      []struct {
-						URL string `json:"url"`
-					} `json:"images"`
-				} `json:"album"`
-				Artists []struct {
-					ID   string `json:"id"`
-					Name string `json:"name"`
-				} `json:"artists"`
-				DurationMs int    `json:"duration_ms"`
-				ID         string `json:"id"`
-				Name       string `json:"name"`
-				Popularity int32  `json:"popularity"`
-			}
+			Items spotifyItems `json:"items"`
 		}
 	}
 	err = json.NewDecoder(resp.Body).Decode(&data)
@@ -358,6 +341,115 @@ func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTra
 		return int(weight)
 	})
 	return results, nil
+}
+
+// Import imports a playlist from Spotify given its playlist ID. It returns the created playlist ID in the local library
+// as well as any error encountered.
+func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (string, error) {
+	// we need two things: get playlist name, description, cover image
+	// and get playlist tracks
+
+	// there's actually a chance this token expires during the requests, haha
+	tk, err := l.spotifyToken.Token(ctx)
+	if err != nil {
+		return "", fmt.Errorf("get spotify token: %w", err)
+	}
+	playlistsBaseAPIUrl := "https://api.spotify.com/v1/playlists/" + spotifyPlaylistID
+
+	// get cover image
+	playlistReq, err := http.NewRequestWithContext(ctx, http.MethodGet, playlistsBaseAPIUrl, nil)
+	if err != nil {
+		return "", fmt.Errorf("create get playlist request: %w", err)
+	}
+	playlistReq.Header.Set("Authorization", "Bearer "+tk)
+	playlistResp, err := http.DefaultClient.Do(playlistReq)
+	if err != nil {
+		return "", fmt.Errorf("perform get playlist request: %w", err)
+	}
+	defer playlistResp.Body.Close()
+	if playlistResp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(playlistResp.Body)
+		slog.Error("get playlist request failed", "status", playlistResp.StatusCode, "body", string(b))
+		return "", fmt.Errorf("get playlist request failed: status %d", playlistResp.StatusCode)
+	}
+
+	var playlistData struct {
+		Images []struct {
+			Url string `json:"url"`
+		} `json:"images"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	err = json.NewDecoder(playlistResp.Body).Decode(&playlistData)
+	if err != nil {
+		return "", fmt.Errorf("decode playlist images response: %w", err)
+	}
+
+	coverURL := playlistData.Images[0].Url // use the first image
+
+	// get playlist tracks
+	tracks := []queries.InsertTrackParams{}
+
+	offset := 0
+	for {
+		tracksReq, err := http.NewRequestWithContext(ctx, http.MethodGet, playlistsBaseAPIUrl+"/tracks?offset="+strconv.Itoa(offset), nil)
+		if err != nil {
+			return "", fmt.Errorf("create playlist tracks request: %w", err)
+		}
+		tracksReq.Header.Set("Authorization", "Bearer "+tk)
+		tracksResp, err := http.DefaultClient.Do(tracksReq)
+		if err != nil {
+			return "", fmt.Errorf("perform playlist tracks request: %w", err)
+		}
+		defer tracksResp.Body.Close()
+
+		if tracksResp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(tracksResp.Body)
+			slog.Error("playlist tracks request failed", "status", tracksResp.StatusCode, "body", string(b))
+			return "", fmt.Errorf("playlist tracks request failed: status %d", tracksResp.StatusCode)
+		}
+		var tracksData struct {
+			Next  *string `json:"next"`
+			Items []struct {
+				Track spotifyItem `json:"track"`
+			} `json:"items"`
+		}
+		err = json.NewDecoder(tracksResp.Body).Decode(&tracksData)
+		if err != nil {
+			return "", fmt.Errorf("decode playlist tracks response: %w", err)
+		}
+		for _, item := range tracksData.Items {
+			tracks = append(tracks, insertParamsFromItem(item.Track))
+		}
+
+		if tracksData.Next == nil {
+			break
+		}
+		offset += len(tracksData.Items) // next page
+	}
+
+	playlistID, err := l.CreatePlaylist(ctx, playlistData.Name, playlistData.Description, coverURL)
+	if err != nil {
+		return "", fmt.Errorf("create playlist in library: %w", err)
+	}
+	for _, track := range tracks {
+		// not using AddTrackToPlaylist to avoid spawning multiple download goroutines
+		err := l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
+			PlaylistID: optuuid(uuid.MustParse(playlistID)),
+			TrackID:    track.TrackID,
+		})
+		if err != nil {
+			slog.Warn("add track to imported playlist", "error", err, "track_id", track.TrackID, "playlist_id", playlistID)
+		}
+	}
+
+	// another best effort download, ignore error
+	err = l.Download(ctx, []string{"https://open.spotify.com/playlist/" + spotifyPlaylistID})
+	if err != nil {
+		slog.Error("download playlist during import", "error", err, "playlist_id", playlistID, "spotify_playlist_id", spotifyPlaylistID)
+	}
+
+	return playlistID, nil
 }
 
 func releaseDate(d string) pgtype.Date {
