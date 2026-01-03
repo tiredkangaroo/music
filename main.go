@@ -21,13 +21,13 @@ func main() {
 	}
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, "postgres://musicer:@localhost:5432/music")
+	pool, err := pgxpool.New(ctx, env.DefaultEnv.PostgresURL)
 	if err != nil {
 		panic(err)
 	}
 	defer pool.Close()
 
-	lib := library.NewLibrary("/Users/ajiteshkumar/Documents/projects/music/experiment", pool)
+	lib := library.NewLibrary(env.DefaultEnv.DataPath, pool)
 
 	srv := server.NewServer(lib)
 	if err := srv.Serve(); err != nil {

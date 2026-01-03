@@ -29,6 +29,7 @@ var DefaultEnv = Environment{
 	CertPath:            os.Getenv("CERT_PATH"),
 	KeyPath:             os.Getenv("KEY_PATH"),
 	PostgresURL:         dv(os.Getenv("POSTGRES_URL"), "postgres://musicer:@localhost:5432/music"),
+	DataPath:            dv(os.Getenv("DATA_PATH"), "/var/lib/musicer/data"),
 }
 
 // Init initializes the environment by checking required variables. It returns an error if any required variable is missing.
