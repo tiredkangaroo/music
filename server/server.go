@@ -229,8 +229,13 @@ func (s *Server) Serve() error {
 		return c.JSON(200, map[string]string{"image_url": env.DefaultEnv.StorageURL + "/pull/" + string(data)})
 
 	})
-
-	return e.Start(env.DefaultEnv.ServerAddress)
+	if env.DefaultEnv.CertPath != "" && env.DefaultEnv.KeyPath != "" {
+		slog.Info("starting server with TLS", "address", env.DefaultEnv.ServerAddress)
+		return e.StartTLS(env.DefaultEnv.ServerAddress, env.DefaultEnv.CertPath, env.DefaultEnv.KeyPath)
+	} else {
+		slog.Info("starting server without TLS", "address", env.DefaultEnv.ServerAddress)
+		return e.Start(env.DefaultEnv.ServerAddress)
+	}
 }
 
 func NewServer(lib *library.Library) *Server {
