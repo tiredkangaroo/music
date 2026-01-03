@@ -16,6 +16,7 @@ type Environment struct {
 	CertPath            string
 	KeyPath             string
 	PostgresURL         string
+	DataPath            string
 }
 
 var DefaultEnv = Environment{
