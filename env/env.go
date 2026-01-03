@@ -15,6 +15,7 @@ type Environment struct {
 	StorageAPISecret    string
 	CertPath            string
 	KeyPath             string
+	PostgresURL         string
 }
 
 var DefaultEnv = Environment{
@@ -27,6 +28,7 @@ var DefaultEnv = Environment{
 	StorageAPISecret:    os.Getenv("STORAGE_API_SECRET"),
 	CertPath:            os.Getenv("CERT_PATH"),
 	KeyPath:             os.Getenv("KEY_PATH"),
+	PostgresURL:         dv(os.Getenv("POSTGRES_URL"), "postgres://musicer:@localhost:5432/music"),
 }
 
 // Init initializes the environment by checking required variables. It returns an error if any required variable is missing.
