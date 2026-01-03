@@ -197,7 +197,7 @@ func (l *Library) Play(ctx context.Context, trackID string) (io.ReadCloser, erro
 	// where older tracks may be deleted from storage for space management
 	// but their metadata remains in the database so it can be played
 	// the file should be re-downloaded if not found
-	p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
+	p := l.PathToTrackFile(trackID)
 	rd, err := os.Open(p)
 	if err == nil {
 		return rd, nil
@@ -211,6 +211,10 @@ func (l *Library) Play(ctx context.Context, trackID string) (io.ReadCloser, erro
 		return nil, fmt.Errorf("download track: %w", err)
 	}
 	return os.Open(p)
+}
+
+func (l *Library) PathToTrackFile(trackID string) string {
+	return filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
 }
 
 // RecordPlay records a play of the specified track in the database.
@@ -345,32 +349,32 @@ func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTra
 
 // Import imports a playlist from Spotify given its playlist ID. It returns the created playlist ID in the local library
 // as well as any error encountered.
-func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (string, error) {
+func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (queries.Playlist, error) {
 	// we need two things: get playlist name, description, cover image
 	// and get playlist tracks
 
 	// there's actually a chance this token expires during the requests, haha
 	tk, err := l.spotifyToken.Token(ctx)
 	if err != nil {
-		return "", fmt.Errorf("get spotify token: %w", err)
+		return queries.Playlist{}, fmt.Errorf("get spotify token: %w", err)
 	}
 	playlistsBaseAPIUrl := "https://api.spotify.com/v1/playlists/" + spotifyPlaylistID
 
 	// get cover image
 	playlistReq, err := http.NewRequestWithContext(ctx, http.MethodGet, playlistsBaseAPIUrl, nil)
 	if err != nil {
-		return "", fmt.Errorf("create get playlist request: %w", err)
+		return queries.Playlist{}, fmt.Errorf("create get playlist request: %w", err)
 	}
 	playlistReq.Header.Set("Authorization", "Bearer "+tk)
 	playlistResp, err := http.DefaultClient.Do(playlistReq)
 	if err != nil {
-		return "", fmt.Errorf("perform get playlist request: %w", err)
+		return queries.Playlist{}, fmt.Errorf("perform get playlist request: %w", err)
 	}
 	defer playlistResp.Body.Close()
 	if playlistResp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(playlistResp.Body)
 		slog.Error("get playlist request failed", "status", playlistResp.StatusCode, "body", string(b))
-		return "", fmt.Errorf("get playlist request failed: status %d", playlistResp.StatusCode)
+		return queries.Playlist{}, fmt.Errorf("get playlist request failed: status %d", playlistResp.StatusCode)
 	}
 
 	var playlistData struct {
@@ -382,7 +386,7 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (string,
 	}
 	err = json.NewDecoder(playlistResp.Body).Decode(&playlistData)
 	if err != nil {
-		return "", fmt.Errorf("decode playlist images response: %w", err)
+		return queries.Playlist{}, fmt.Errorf("decode playlist images response: %w", err)
 	}
 
 	coverURL := playlistData.Images[0].Url // use the first image
@@ -394,19 +398,19 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (string,
 	for {
 		tracksReq, err := http.NewRequestWithContext(ctx, http.MethodGet, playlistsBaseAPIUrl+"/tracks?offset="+strconv.Itoa(offset), nil)
 		if err != nil {
-			return "", fmt.Errorf("create playlist tracks request: %w", err)
+			return queries.Playlist{}, fmt.Errorf("create playlist tracks request: %w", err)
 		}
 		tracksReq.Header.Set("Authorization", "Bearer "+tk)
 		tracksResp, err := http.DefaultClient.Do(tracksReq)
 		if err != nil {
-			return "", fmt.Errorf("perform playlist tracks request: %w", err)
+			return queries.Playlist{}, fmt.Errorf("perform playlist tracks request: %w", err)
 		}
 		defer tracksResp.Body.Close()
 
 		if tracksResp.StatusCode != http.StatusOK {
 			b, _ := io.ReadAll(tracksResp.Body)
 			slog.Error("playlist tracks request failed", "status", tracksResp.StatusCode, "body", string(b))
-			return "", fmt.Errorf("playlist tracks request failed: status %d", tracksResp.StatusCode)
+			return queries.Playlist{}, fmt.Errorf("playlist tracks request failed: status %d", tracksResp.StatusCode)
 		}
 		var tracksData struct {
 			Next  *string `json:"next"`
@@ -416,7 +420,7 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (string,
 		}
 		err = json.NewDecoder(tracksResp.Body).Decode(&tracksData)
 		if err != nil {
-			return "", fmt.Errorf("decode playlist tracks response: %w", err)
+			return queries.Playlist{}, fmt.Errorf("decode playlist tracks response: %w", err)
 		}
 		for _, item := range tracksData.Items {
 			tracks = append(tracks, insertParamsFromItem(item.Track))
@@ -430,8 +434,16 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (string,
 
 	playlistID, err := l.CreatePlaylist(ctx, playlistData.Name, playlistData.Description, coverURL)
 	if err != nil {
-		return "", fmt.Errorf("create playlist in library: %w", err)
+		return queries.Playlist{}, fmt.Errorf("create playlist in library: %w", err)
 	}
+
+	// best effort download, ignore error
+	// must be done before adding tracks to playlist to ensure the tracks exist (avoid foreign key violation)
+	err = l.Download(ctx, []string{"https://open.spotify.com/playlist/" + spotifyPlaylistID})
+	if err != nil {
+		slog.Error("download playlist during import", "error", err, "playlist_id", playlistID, "spotify_playlist_id", spotifyPlaylistID)
+	}
+
 	for _, track := range tracks {
 		// not using AddTrackToPlaylist to avoid spawning multiple download goroutines
 		err := l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
@@ -443,13 +455,13 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (string,
 		}
 	}
 
-	// another best effort download, ignore error
-	err = l.Download(ctx, []string{"https://open.spotify.com/playlist/" + spotifyPlaylistID})
-	if err != nil {
-		slog.Error("download playlist during import", "error", err, "playlist_id", playlistID, "spotify_playlist_id", spotifyPlaylistID)
-	}
-
-	return playlistID, nil
+	return queries.Playlist{
+		ID:          optuuid(uuid.MustParse(playlistID)),
+		Name:        playlistData.Name,
+		Description: playlistData.Description,
+		ImageUrl:    coverURL,
+		CreatedAt:   opttime(time.Now()),
+	}, nil
 }
 
 func releaseDate(d string) pgtype.Date {

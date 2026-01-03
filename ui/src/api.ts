@@ -1,6 +1,6 @@
 import type { PlaylistHead, Playlist, Track } from "./types.ts";
 
-const API_BASE = "http://localhost:8080";
+const API_BASE = "http://192.168.86.38:8080";
 
 export async function searchTracks(q: string): Promise<Track[]> {
   const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`);
@@ -31,6 +31,15 @@ export async function createPlaylist(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, description, image_url }),
+  });
+  return res.json();
+}
+
+export async function importPlaylist(playlistURL: string) {
+  const res = await fetch(`${API_BASE}/playlists/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ spotify_playlist_url: playlistURL }),
   });
   return res.json();
 }

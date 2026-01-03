@@ -1,6 +1,12 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import type { PlayerState, Playlist, PlaylistHead } from "./types";
-import { createPlaylist, getPlaylist, listPlaylists, uploadImage } from "./api";
+import {
+  createPlaylist,
+  getPlaylist,
+  importPlaylist,
+  listPlaylists,
+  uploadImage,
+} from "./api";
 import { PlaylistHeadView } from "./components/PlaylistHead";
 import { PlaylistView } from "./components/Playlist";
 import { PlayerContext, SetPlayerContext } from "./PlayerContext";
@@ -127,6 +133,7 @@ function NewPlaylistDialog(props: {
   const newPlaylistImageContainerRef = useRef<HTMLDivElement>(null);
   const newPlaylistNameRef = useRef<HTMLInputElement>(null);
   const newPlaylistDescriptionRef = useRef<HTMLTextAreaElement>(null);
+  const importPlaylistURLInputRef = useRef<HTMLInputElement>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   async function handleCreatePlaylist() {
@@ -169,6 +176,20 @@ function NewPlaylistDialog(props: {
       newPlaylistImageRef.current!.value = "";
       setErrorMessage("");
       setSelectedPlaylist(newPlaylistID);
+      newPlaylistDialogRef.current?.close();
+    });
+  }
+
+  async function handleImportPlaylist() {
+    const url = importPlaylistURLInputRef.current?.value.trim() || "";
+    if (url === "") {
+      setErrorMessage("please enter a playlist URL");
+      return;
+    }
+    importPlaylist(url).then((resp: PlaylistHead) => {
+      setPlaylists([resp, ...playlists]);
+      setErrorMessage("");
+      setSelectedPlaylist(resp.id);
       newPlaylistDialogRef.current?.close();
     });
   }
@@ -317,6 +338,27 @@ function NewPlaylistDialog(props: {
         >
           Create
         </button>
+        <div className="flex flex-row items-center gap-2">
+          <hr className="flex-1 border-t-2 border-black" />
+          <span className="font-bold">OR</span>
+          <hr className="flex-1 border-t-2 border-black" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold">Import</h1>
+          <input
+            className="p-2 border border-black w-full mt-4 resize-none"
+            placeholder="Spotify Playlist URL"
+            id="import-playlist-url"
+            type="text"
+            ref={importPlaylistURLInputRef}
+          ></input>
+          <button
+            className="bg-green-700 text-white px-4 py-2 rounded mt-4 w-full"
+            onClick={handleImportPlaylist}
+          >
+            Import Playlist
+          </button>
+        </div>
       </div>
     </dialog>
   );

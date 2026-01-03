@@ -1,13 +1,14 @@
 package server
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"fmt"
 	"io"
 	"log/slog"
-	"mime"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -49,12 +50,19 @@ func (s *Server) Serve() error {
 		if trackID == "" {
 			return c.JSON(400, errormap("trackID parameter is required"))
 		}
-		data, err := s.lib.Play(c.Request().Context(), trackID)
+		rd, err := s.lib.Play(c.Request().Context(), trackID)
 		if err != nil {
 			return c.JSON(500, errormap(err.Error()))
 		}
-		defer data.Close()
-		return c.Stream(http.StatusOK, mime.TypeByExtension(".m4a"), data)
+		data, err := io.ReadAll(rd) // drain the reader to a buffer
+		if err != nil {
+			return c.JSON(500, errormap(err.Error()))
+		}
+		defer rd.Close()
+
+		// serve the content
+		http.ServeContent(c.Response().Writer, c.Request(), s.lib.PathToTrackFile(trackID), time.Time{}, bytes.NewReader(data))
+		return nil
 	})
 
 	e.POST("/record/play/:trackID", func(c echo.Context) error {
@@ -111,9 +119,27 @@ func (s *Server) Serve() error {
 		return c.JSON(200, map[string]string{"playlist_id": playlistID})
 	}))
 
-	// e.POST("/import", func(c echo.Context) error {
+	e.POST("/playlists/import", bindreq(func(c echo.Context, req struct {
+		SpotifyPlaylistURL string `json:"spotify_playlist_url"`
+	}) error {
+		u, err := url.Parse(req.SpotifyPlaylistURL)
+		if err != nil {
+			return c.JSON(400, errormap("invalid spotify url"))
+		}
+		if u.Host != "open.spotify.com" {
+			return c.JSON(400, errormap("invalid spotify url"))
+		}
+		if u.Path[:10] != "/playlist/" {
+			return c.JSON(400, errormap("invalid spotify url"))
+		}
+		spotifyPlaylistID := u.Path[10:]
 
-	// })
+		playlist, err := s.lib.Import(c.Request().Context(), spotifyPlaylistID)
+		if err != nil {
+			return c.JSON(500, errormap(err.Error()))
+		}
+		return c.JSON(200, playlist)
+	}))
 
 	// delete playlist
 	e.DELETE("/playlists/:playlistID", func(c echo.Context) error {
