@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PlayerState, Playlist, PlaylistHead } from "./types";
 import {
   createPlaylist,

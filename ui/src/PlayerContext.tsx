@@ -11,6 +11,7 @@ export const PlayerContext = createContext<PlayerState>({
   previousTracks: [],
   fromPlaylist: null,
   shuffle: false,
+  playID: null,
 });
 export const SetPlayerContext = createContext<
   React.Dispatch<React.SetStateAction<PlayerState>>
