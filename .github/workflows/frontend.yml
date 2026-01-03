@@ -2,8 +2,12 @@ name: Deploy Vite App to GitHub Pages
 
 on:
   push:
+    # does this do both branches and paths or just one of them? bc if its just one then paths doesn't matter.
     branches:
       - main
+    paths:
+      - "ui/**"
+      - ".github/workflows/frontend.yml"
 
 permissions:
   contents: read
