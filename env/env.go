@@ -13,6 +13,8 @@ type Environment struct {
 	ServerAddress       string
 	StorageURL          string
 	StorageAPISecret    string
+	CertPath            string
+	KeyPath             string
 }
 
 var DefaultEnv = Environment{
@@ -23,6 +25,8 @@ var DefaultEnv = Environment{
 	ServerAddress:       dv(os.Getenv("SERVER_ADDRESS"), ":8080"),
 	StorageURL:          dv(os.Getenv("STORAGE_URL"), "https://storage.mechanicaldinosaurs.net"),
 	StorageAPISecret:    os.Getenv("STORAGE_API_SECRET"),
+	CertPath:            os.Getenv("CERT_PATH"),
+	KeyPath:             os.Getenv("KEY_PATH"),
 }
 
 // Init initializes the environment by checking required variables. It returns an error if any required variable is missing.
