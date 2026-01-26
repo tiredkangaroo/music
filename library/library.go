@@ -50,11 +50,13 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 	cmd.Stderr = logs
 	cmd.Dir = l.storagePath
 
+	slog.Info("running spotdl", "cmd", cmd.String())
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("spotdl command failed: %w\nlogs: %s", err, logs.String())
 	} else if env.DefaultEnv.Debug {
 		slog.Debug("spotdl logs", "logs", logs.String())
 	}
+	slog.Info("spotdl command completed successfully")
 	mdfile := filepath.Join(l.storagePath, "metadata.spotdl")
 	defer os.Remove(mdfile)
 
@@ -104,6 +106,7 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 			Duration:         m.Duration,
 			Popularity:       m.Popularity,
 			TrackReleaseDate: track_date,
+			Downloaded:       true,
 		})
 		if err != nil {
 			return fmt.Errorf("insert track: %w", err)
@@ -125,8 +128,14 @@ func (l *Library) DownloadIfNotExists(ctx context.Context, trackIDs ...string) e
 		p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
 		if _, err := os.Stat(p); os.IsNotExist(err) {
 			if err := l.Download(ctx, []string{"https://open.spotify.com/track/" + trackID}); err != nil {
+				slog.Error("download track", "error", err, "track_id", trackID)
 				return fmt.Errorf("download track %s (successfully downloaded %d/%d): %w", trackID, i, len(trackIDs), err)
 			}
+		}
+	}
+	for _, id := range trackIDs {
+		if err := l.queries.MarkTrackAsDownloaded(ctx, id); err != nil {
+			slog.Error("mark track as downloaded", "error", err, "track_id", id)
 		}
 	}
 	return nil
@@ -205,9 +214,13 @@ func (l *Library) Play(ctx context.Context, trackID string) (io.ReadCloser, erro
 	if !os.IsNotExist(err) {
 		return nil, fmt.Errorf("open track file: %w", err)
 	}
+	if env.DefaultEnv.Debug {
+		slog.Info("track file not found, re-downloading", "track_id", trackID)
+	}
 
 	// file not found, re-download
 	if err := l.Download(ctx, []string{"https://open.spotify.com/track/" + trackID}); err != nil {
+		slog.Error("download track", "error", err, "track_id", trackID)
 		return nil, fmt.Errorf("download track: %w", err)
 	}
 	return os.Open(p)

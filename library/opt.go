@@ -51,6 +51,8 @@ func insertParamsFromSearchRow(t queries.SearchTrackByNameRow) queries.InsertTra
 
 		Duration:   t.Duration,
 		Popularity: t.Popularity,
+
+		Downloaded: false, // leave as false (we're just copying data from search)
 	}
 }
 

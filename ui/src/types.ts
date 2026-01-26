@@ -11,6 +11,7 @@ export interface Track {
   cover_url?: string;
   album_release_date?: string;
   artist_name?: string;
+  downloaded?: boolean;
 }
 
 export interface PlaylistHead {
@@ -37,3 +38,7 @@ export interface PlayerState {
   shuffle: boolean;
   playID: string | null;
 }
+
+export type WithError<T> = T & {
+  error?: string;
+};

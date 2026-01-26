@@ -47,9 +47,32 @@ export function TrackView(props: {
           </div>
         </div>
         <div className="flex flex-col gap-2 items-end justify-center">
-          <span className="text-sm text-gray-500">
-            {formatDuration(track.duration)}
-          </span>
+          <div className="flex flex-row gap-2 items-center">
+            <div
+              title={props.track.downloaded ? "Downloaded" : "Not Downloaded"}
+            >
+              {props.track.downloaded !== undefined && (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={props.track.downloaded ? "#28ed53" : "#363636"}
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 17V3" />
+                  <path d="m6 11 6 6 6-6" />
+                  <path d="M19 21H5" />
+                </svg>
+              )}
+            </div>
+            <span className="text-sm text-gray-500">
+              {formatDuration(track.duration)}
+            </span>
+          </div>
           {props.addTrack && (
             <button
               className="text-sm font-bold bg-green-300 h-fit py-1 px-3 border-r-2 border-b-2 border-black"

@@ -1,4 +1,4 @@
-import type { PlaylistHead, Playlist, Track } from "./types.ts";
+import type { PlaylistHead, Playlist, Track, WithError } from "./types.ts";
 
 const API_BASE =
   import.meta.env.VITE_API_BASE || "https://home.mechanicaldinosaurs.net:8443";
@@ -13,7 +13,7 @@ export function playTrack(trackID: string) {
   return `${API_BASE}/play/${trackID}`;
 }
 
-export async function listPlaylists(): Promise<PlaylistHead[]> {
+export async function listPlaylists(): Promise<WithError<PlaylistHead[]>> {
   const res = await fetch(`${API_BASE}/playlists`);
   return res.json();
 }
@@ -26,7 +26,7 @@ export async function getPlaylist(id: string): Promise<Playlist> {
 export async function createPlaylist(
   name: string,
   description: string,
-  image_url: string
+  image_url: string,
 ) {
   const res = await fetch(`${API_BASE}/playlists`, {
     method: "POST",
@@ -59,7 +59,7 @@ export async function addTrackToPlaylist(playlistID: string, trackID: string) {
 
 export async function removeTrackFromPlaylist(
   playlistID: string,
-  trackID: string
+  trackID: string,
 ) {
   await fetch(`${API_BASE}/playlists/${playlistID}/tracks/${trackID}`, {
     method: "DELETE",

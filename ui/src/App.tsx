@@ -11,11 +11,16 @@ import { PlaylistHeadView } from "./components/PlaylistHead";
 import { PlaylistView } from "./components/Playlist";
 import { PlayerContext, SetPlayerContext } from "./PlayerContext";
 import { Player } from "./components/Player";
+import {
+  CriticalErrorContext,
+  SetCriticalErrorContext,
+} from "./CriticalErrorContext";
 
 export default function App() {
   const [playlists, setPlaylists] = useState<PlaylistHead[]>([]);
+  const [criticalError, setCriticalError] = useState<string | null>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(
-    null
+    null,
   );
   const [playerState, setPlayerState] = useState<PlayerState>({
     currentTrack: null,
@@ -32,52 +37,80 @@ export default function App() {
 
   // fetch playlists
   useEffect(() => {
-    listPlaylists().then((data) => setPlaylists(data));
+    listPlaylists().then((data) => {
+      if (data.error) {
+        setCriticalError(data.error);
+        return;
+      }
+      setPlaylists(data);
+    });
   }, []);
   function selectPlaylist(id: string) {
     getPlaylist(id).then((data) => setSelectedPlaylist(data));
   }
 
-  return (
-    <PlayerContext.Provider value={playerState}>
-      <SetPlayerContext.Provider value={setPlayerState}>
-        <div className="min-h-screen font-mono bg-[#edf5ff] flex flex-col md:flex-row w-full h-full">
-          <Sidebar
-            playlists={playlists}
-            setPlaylists={setPlaylists}
-            selectPlaylist={selectPlaylist}
-          />
-          <MainContent
-            playlist={selectedPlaylist}
-            setPlaylist={(p) => {
-              if (p === null) {
-                setSelectedPlaylist(null); // clear selected playlist
-                const updatedPlaylists = [...playlists].filter(
-                  // remove deleted playlist
-                  (pl) => pl.id !== selectedPlaylist?.id
-                );
-                setPlaylists(updatedPlaylists);
-                return;
-              }
-              // update playlist details
-              setSelectedPlaylist(p);
-              const updatedPlaylists = [...playlists];
-              const index = updatedPlaylists.findIndex((pl) => pl.id === p.id);
-              if (index !== -1) {
-                updatedPlaylists[index] = {
-                  id: p.id,
-                  name: p.name,
-                  description: p.description,
-                  image_url: p.image_url,
-                  created_at: p.created_at,
-                };
-                setPlaylists(updatedPlaylists);
-              }
-            }}
-          />
+  if (criticalError !== null) {
+    return (
+      <div className="min-h-screen flex flex-col justify-center items-center bg-red-200 font-mono w-full p-[25%] text-center">
+        <h1 className="text-4xl font-bold mb-4">Something Went Wrong</h1>
+        <div className="mt-4 p-4 bg-red-100 border-2 border-red-600 text-red-800 w-full">
+          {criticalError}
         </div>
-      </SetPlayerContext.Provider>
-    </PlayerContext.Provider>
+        <button
+          className="mt-4 px-4 py-2 bg-red-600 text-white font-bold rounded"
+          onClick={() => window.location.reload()}
+        >
+          Reload
+        </button>
+      </div>
+    );
+  }
+  return (
+    <CriticalErrorContext.Provider value={criticalError}>
+      <SetCriticalErrorContext.Provider value={setCriticalError}>
+        <PlayerContext.Provider value={playerState}>
+          <SetPlayerContext.Provider value={setPlayerState}>
+            <div className="min-h-screen font-mono bg-[#edf5ff] flex flex-col md:flex-row w-full h-full">
+              <Sidebar
+                playlists={playlists}
+                setPlaylists={setPlaylists}
+                selectPlaylist={selectPlaylist}
+              />
+              <MainContent
+                playlist={selectedPlaylist}
+                setPlaylist={(p) => {
+                  if (p === null) {
+                    setSelectedPlaylist(null); // clear selected playlist
+                    const updatedPlaylists = [...playlists].filter(
+                      // remove deleted playlist
+                      (pl) => pl.id !== selectedPlaylist?.id,
+                    );
+                    setPlaylists(updatedPlaylists);
+                    return;
+                  }
+                  // update playlist details
+                  setSelectedPlaylist(p);
+                  const updatedPlaylists = [...playlists];
+                  const index = updatedPlaylists.findIndex(
+                    (pl) => pl.id === p.id,
+                  );
+                  if (index !== -1) {
+                    updatedPlaylists[index] = {
+                      id: p.id,
+                      name: p.name,
+                      description: p.description,
+                      image_url: p.image_url,
+                      created_at: p.created_at,
+                    };
+                    setPlaylists(updatedPlaylists);
+                  }
+                }}
+              />
+            </div>
+          </SetPlayerContext.Provider>
+        </PlayerContext.Provider>
+      </SetCriticalErrorContext.Provider>
+    </CriticalErrorContext.Provider>
   );
 }
 
@@ -293,7 +326,7 @@ function NewPlaylistDialog(props: {
                     }
                     if (img.width < 300 || img.height < 300) {
                       setErrorMessage(
-                        "image dimensions should be at least 300x300 pixels"
+                        "image dimensions should be at least 300x300 pixels",
                       );
                       input.value = "";
                       return;
@@ -372,7 +405,7 @@ function MainContent(props: {
   if (!playlist) {
     return (
       <div className="flex-1 flex flex-col justify-center items-center">
-        <h1 className="text-4xl font-bold">hi?!</h1>
+        <h1 className="text-4xl font-bold">select a playlist</h1>
       </div>
     );
   }

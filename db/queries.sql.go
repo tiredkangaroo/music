@@ -72,6 +72,7 @@ SELECT
                 'artist_id', t.artist_id,
                 'artists', t.artists,
                 'cover_url', a.cover_url,
+                'downloaded', t.downloaded,
                 'track_release_date', t.track_release_date
             )
         ) FILTER (WHERE t.track_id IS NOT NULL),
@@ -109,7 +110,7 @@ func (q *Queries) GetPlaylist(ctx context.Context, id pgtype.UUID) (GetPlaylistR
 }
 
 const getTrackByID = `-- name: GetTrackByID :one
-SELECT track_id, track_name, duration, popularity, album_id, artist_id, artists, track_release_date FROM tracks WHERE track_id = $1
+SELECT track_id, track_name, duration, popularity, album_id, artist_id, artists, track_release_date, downloaded FROM tracks WHERE track_id = $1
 `
 
 func (q *Queries) GetTrackByID(ctx context.Context, trackID string) (Track, error) {
@@ -124,6 +125,7 @@ func (q *Queries) GetTrackByID(ctx context.Context, trackID string) (Track, erro
 		&i.ArtistID,
 		&i.Artists,
 		&i.TrackReleaseDate,
+		&i.Downloaded,
 	)
 	return i, err
 }
@@ -147,7 +149,8 @@ INSERT INTO tracks (
     album_id,
     artist_id,
     artists,
-    track_release_date
+    track_release_date,
+    downloaded
 )
 VALUES (
     $7,
@@ -157,7 +160,8 @@ VALUES (
     $3,
     $1,
     $11,
-    $12
+    $12,
+    $13
 )
 ON CONFLICT (track_id) DO NOTHING
 `
@@ -175,6 +179,7 @@ type InsertTrackParams struct {
 	Popularity       int32       `json:"popularity"`
 	Artists          []string    `json:"artists"`
 	TrackReleaseDate pgtype.Date `json:"track_release_date"`
+	Downloaded       bool        `json:"downloaded"`
 }
 
 func (q *Queries) InsertTrack(ctx context.Context, arg InsertTrackParams) error {
@@ -191,6 +196,7 @@ func (q *Queries) InsertTrack(ctx context.Context, arg InsertTrackParams) error 
 		arg.Popularity,
 		arg.Artists,
 		arg.TrackReleaseDate,
+		arg.Downloaded,
 	)
 	return err
 }
@@ -223,6 +229,28 @@ func (q *Queries) ListPlaylists(ctx context.Context) ([]Playlist, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const markTrackAsDownloaded = `-- name: MarkTrackAsDownloaded :exec
+UPDATE tracks
+SET downloaded = TRUE
+WHERE track_id = $1
+`
+
+func (q *Queries) MarkTrackAsDownloaded(ctx context.Context, trackID string) error {
+	_, err := q.db.Exec(ctx, markTrackAsDownloaded, trackID)
+	return err
+}
+
+const markTrackAsNotDownloaded = `-- name: MarkTrackAsNotDownloaded :exec
+UPDATE tracks
+SET downloaded = FALSE
+WHERE track_id = $1
+`
+
+func (q *Queries) MarkTrackAsNotDownloaded(ctx context.Context, trackID string) error {
+	_, err := q.db.Exec(ctx, markTrackAsNotDownloaded, trackID)
+	return err
 }
 
 const recordPlay = `-- name: RecordPlay :one
@@ -277,7 +305,7 @@ func (q *Queries) RemoveTrackFromPlaylist(ctx context.Context, arg RemoveTrackFr
 }
 
 const searchTrackByName = `-- name: SearchTrackByName :many
-SELECT track_id, track_name, duration, popularity, tracks.album_id, tracks.artist_id, artists, track_release_date, albums.album_id, album_name, albums.artist_id, cover_url, album_release_date, artists.artist_id, artist_name FROM tracks
+SELECT track_id, track_name, duration, popularity, tracks.album_id, tracks.artist_id, artists, track_release_date, downloaded, albums.album_id, album_name, albums.artist_id, cover_url, album_release_date, artists.artist_id, artist_name FROM tracks
 JOIN albums ON tracks.album_id = albums.album_id
 JOIN artists ON tracks.artist_id = artists.artist_id
 WHERE track_name ILIKE '%' || $1 || '%'
@@ -299,6 +327,7 @@ type SearchTrackByNameRow struct {
 	ArtistID         string      `json:"artist_id"`
 	Artists          []string    `json:"artists"`
 	TrackReleaseDate pgtype.Date `json:"track_release_date"`
+	Downloaded       bool        `json:"downloaded"`
 	AlbumID_2        string      `json:"album_id_2"`
 	AlbumName        string      `json:"album_name"`
 	ArtistID_2       string      `json:"artist_id_2"`
@@ -326,6 +355,7 @@ func (q *Queries) SearchTrackByName(ctx context.Context, arg SearchTrackByNamePa
 			&i.ArtistID,
 			&i.Artists,
 			&i.TrackReleaseDate,
+			&i.Downloaded,
 			&i.AlbumID_2,
 			&i.AlbumName,
 			&i.ArtistID_2,

@@ -17,7 +17,8 @@ INSERT INTO tracks (
     album_id,
     artist_id,
     artists,
-    track_release_date
+    track_release_date,
+    downloaded
 )
 VALUES (
     $7,
@@ -27,7 +28,8 @@ VALUES (
     $3,
     $1,
     $11,
-    $12
+    $12,
+    $13
 )
 ON CONFLICT (track_id) DO NOTHING;
 
@@ -74,6 +76,7 @@ SELECT
                 'artist_id', t.artist_id,
                 'artists', t.artists,
                 'cover_url', a.cover_url,
+                'downloaded', t.downloaded,
                 'track_release_date', t.track_release_date
             )
         ) FILTER (WHERE t.track_id IS NOT NULL),
@@ -102,3 +105,13 @@ RETURNING play_id;
 UPDATE plays
 SET skipped_at = $1
 WHERE play_id = $2;
+
+-- name: MarkTrackAsDownloaded :exec
+UPDATE tracks
+SET downloaded = TRUE
+WHERE track_id = $1;
+
+-- name: MarkTrackAsNotDownloaded :exec
+UPDATE tracks
+SET downloaded = FALSE
+WHERE track_id = $1;

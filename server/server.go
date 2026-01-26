@@ -26,7 +26,6 @@ type Server struct {
 
 func (s *Server) Serve() error {
 	e := echo.New()
-	e.Use(middleware.RequestLogger())
 
 	if env.DefaultEnv.Debug {
 		slog.Info("debug mode enabled")
