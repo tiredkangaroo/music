@@ -183,7 +183,20 @@ func (s *Server) Serve() error {
 		return c.JSON(200, nil)
 	})
 
-	// store an image
+	// request download of a track
+	e.POST("/download/:trackID", func(c echo.Context) error {
+		trackID := c.Param("trackID")
+		if trackID == "" {
+			return c.JSON(400, errormap("trackID parameter is required"))
+		}
+		err := s.lib.DownloadIfNotExists(c.Request().Context(), trackID)
+		if err != nil {
+			return c.JSON(500, errormap(err.Error()))
+		}
+		return c.JSON(200, nil) // should this be a 204?
+	})
+
+	// store an image into storage
 	e.POST("/images", func(c echo.Context) error {
 		file, err := c.FormFile("image")
 		if err != nil {

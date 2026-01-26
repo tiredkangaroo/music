@@ -53,8 +53,6 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("spotdl command failed: %w\nlogs: %s", err, logs.String())
-	} else if env.DefaultEnv.Debug {
-		slog.Debug("spotdl logs", "logs", logs.String())
 	}
 	mdfile := filepath.Join(l.storagePath, "metadata.spotdl")
 	defer os.Remove(mdfile)

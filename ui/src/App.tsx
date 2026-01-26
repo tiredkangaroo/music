@@ -15,6 +15,7 @@ import {
   CriticalErrorContext,
   SetCriticalErrorContext,
 } from "./CriticalErrorContext";
+import { QueueView } from "./components/QueueView";
 
 export default function App() {
   const [playlists, setPlaylists] = useState<PlaylistHead[]>([]);
@@ -402,6 +403,8 @@ function MainContent(props: {
   setPlaylist: (playlist: Playlist) => void;
 }) {
   const { playlist } = props;
+  const [isQueueOpen, setIsQueueOpen] = useState<boolean>(false);
+
   if (!playlist) {
     return (
       <div className="flex-1 flex flex-col justify-center items-center">
@@ -411,10 +414,11 @@ function MainContent(props: {
   }
   return (
     <div className="flex flex-col w-full h-screen">
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 flex flex-row">
         <PlaylistView playlist={playlist} setPlaylist={props.setPlaylist} />
+        <QueueView isOpen={isQueueOpen} setIsOpen={setIsQueueOpen} />
       </div>
-      <Player />
+      <Player isQueueOpen={isQueueOpen} setIsQueueOpen={setIsQueueOpen} />
     </div>
   );
 }

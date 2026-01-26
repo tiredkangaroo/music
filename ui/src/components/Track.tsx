@@ -1,11 +1,12 @@
 import { useContext } from "react";
 import type { Track } from "../types.ts";
 import { PlayerContext, SetPlayerContext } from "../PlayerContext.tsx";
-import { recordPlay, recordSkip } from "../api.ts";
+import { recordPlay, recordSkip, requestDownload } from "../api.ts";
 export function TrackView(props: {
   track: Track;
   addTrack?: () => void;
   removeTrack?: () => void;
+  customOnClick?: () => void;
 }) {
   const playerState = useContext(PlayerContext);
   const setPlayerState = useContext(SetPlayerContext);
@@ -15,6 +16,10 @@ export function TrackView(props: {
       className="p-4 border-t-3 border-l-3 border-r-6 border-b-6 border-gray-300 cursor-pointer"
       // play track on click (resetting the queue)
       onClick={async () => {
+        if (props.customOnClick) {
+          props.customOnClick();
+          return;
+        }
         if (playerState.currentTrack?.track_id === track.track_id) {
           return;
         } else if (playerState.currentTrack?.track_id !== null) {
@@ -28,8 +33,7 @@ export function TrackView(props: {
           isPlaying: true,
           currentTime: 0,
           duration: track.duration,
-          //   queuedTracks: playerState.queuedTracks,
-          queuedTracks: [],
+          queuedTracks: playerState.queuedTracks,
           repeat: "off",
           previousTracks: [],
           fromPlaylist: null,
@@ -40,7 +44,7 @@ export function TrackView(props: {
     >
       <div className="flex flex-row justify-between items-center">
         <div className="flex flex-row gap-4 ">
-          <img src={track.cover_url} className="w-12" />
+          <img src={track.cover_url} className="w-12 object-contain" />
           <div>
             <h3 className="text-xl font-medium">{track.track_name}</h3>
             <p className="text-sm text-gray-600">{track.artists.join(", ")}</p>
@@ -50,6 +54,15 @@ export function TrackView(props: {
           <div className="flex flex-row gap-2 items-center">
             <div
               title={props.track.downloaded ? "Downloaded" : "Not Downloaded"}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!props.track.downloaded) {
+                  // request download
+                  requestDownload(props.track.track_id).catch((err) => {
+                    console.error("failed to request download:", err);
+                  });
+                }
+              }}
             >
               {props.track.downloaded !== undefined && (
                 <svg

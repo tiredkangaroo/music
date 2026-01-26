@@ -97,3 +97,10 @@ export async function recordSkip(playID: string, skippedAt: number) {
   });
   if (!res.ok) throw new Error("record skip failed");
 }
+
+export async function requestDownload(trackID: string) {
+  const res = await fetch(`${API_BASE}/download/${trackID}`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("request download failed");
+}

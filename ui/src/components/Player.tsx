@@ -2,7 +2,10 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { PlayerContext, SetPlayerContext } from "../PlayerContext";
 import { playTrack, recordPlay, recordSkip } from "../api";
 
-export function Player() {
+export function Player(props: {
+  isQueueOpen: boolean;
+  setIsQueueOpen: (isOpen: boolean) => void;
+}) {
   const playerState = useContext(PlayerContext);
   const setPlayerState = useContext(SetPlayerContext);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -10,6 +13,7 @@ export function Player() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isWaiting, setIsWaiting] = useState(true);
+  const { isQueueOpen, setIsQueueOpen } = props;
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -324,7 +328,7 @@ export function Player() {
         </span>
       </div>
       <div>
-        <button>
+        <button onClick={() => setIsQueueOpen(!isQueueOpen)}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="24"

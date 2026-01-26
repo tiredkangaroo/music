@@ -43,6 +43,9 @@ export function PlaylistView(props: {
               <h1 className="text-5xl font-bold">{playlist.name}</h1>
               <p className="mt-4 text-lg">{playlist.description}</p>
             </div>
+            <p className="text-sm text-gray-600">
+              {playlist.tracks.length} tracks • {getPlaylistDuration(playlist)}
+            </p>
             <div className="flex flex-row gap-4 items-center">
               <div className="flex flex-col justify-center items-center">
                 <button
@@ -99,8 +102,8 @@ export function PlaylistView(props: {
                           (track) =>
                             !playerState.queuedTracks.includes(track) &&
                             track.track_id !==
-                              playerState.currentTrack?.track_id
-                        )
+                              playerState.currentTrack?.track_id,
+                        ),
                       ); // add rest of tracks to queue
                       setPlayerState({
                         ...playerState,
@@ -126,7 +129,7 @@ export function PlaylistView(props: {
                   const playID = await recordPlay(queue[0].track_id);
                   console.log(
                     "recording play as a result of clicking play playlist",
-                    playID
+                    playID,
                   );
                   setPlayerState({
                     currentTrack: queue[0],
@@ -178,7 +181,7 @@ export function PlaylistView(props: {
                 onClick={() => {
                   //  ask are you sure?
                   const confirmed = confirm(
-                    "Are you sure you want to delete this playlist? This action cannot be undone."
+                    "Are you sure you want to delete this playlist? This action cannot be undone.",
                   );
                   if (!confirmed) return;
                   // user confirmed, delete playlist
@@ -233,7 +236,7 @@ export function PlaylistView(props: {
                       getPlaylist(playlist.id).then((updatedPlaylist) => {
                         setPlaylist(updatedPlaylist);
                       });
-                    }
+                    },
                   );
                 }}
               ></TrackView>
@@ -317,4 +320,34 @@ function shuffleTracks<T>(array: T[]): T[] {
     [shuffledArray[i], shuffledArray[j]] = [shuffledArray[j], shuffledArray[i]];
   }
   return shuffledArray;
+}
+
+function formatDuration(duration: number): string {
+  // days, hours, minutes, seconds
+  const days = Math.floor(duration / 86400);
+  const hours = Math.floor((duration % 86400) / 3600);
+  const minutes = Math.floor((duration % 3600) / 60);
+  const seconds = duration % 60;
+
+  let result = [];
+  if (days > 0) {
+    result.push(`${days} days`);
+  }
+  if (hours > 0) {
+    result.push(`${hours} hours`);
+  }
+  if (minutes > 0) {
+    result.push(`${minutes} minutes`);
+  }
+  if (seconds > 0 || result.length === 0) {
+    result.push(`${seconds} seconds`);
+  }
+  return result.join(" ");
+}
+function getPlaylistDuration(playlist: Playlist): string {
+  const totalDuration = playlist.tracks.reduce(
+    (acc, track) => acc + track.duration,
+    0,
+  );
+  return formatDuration(totalDuration);
 }
