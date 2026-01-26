@@ -43,6 +43,7 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 	args := []string{"download"}
 	args = append(args, things...)
 	args = append(args, "--save-file", "metadata.spotdl", "--output", "{track-id}", "--format", "m4a", "--bitrate", "auto")
+	args = append(args, "--client-id", env.DefaultEnv.SpotifyClientID, "--client-secret", env.DefaultEnv.SpotifyClientSecret)
 
 	logs := new(bytes.Buffer)
 	cmd := exec.Command(env.DefaultEnv.PathToSpotDL, args...)
@@ -50,13 +51,11 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 	cmd.Stderr = logs
 	cmd.Dir = l.storagePath
 
-	slog.Info("running spotdl", "cmd", cmd.String())
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("spotdl command failed: %w\nlogs: %s", err, logs.String())
 	} else if env.DefaultEnv.Debug {
 		slog.Debug("spotdl logs", "logs", logs.String())
 	}
-	slog.Info("spotdl command completed successfully")
 	mdfile := filepath.Join(l.storagePath, "metadata.spotdl")
 	defer os.Remove(mdfile)
 
