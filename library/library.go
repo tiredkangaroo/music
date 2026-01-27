@@ -384,6 +384,9 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (queries
 	if playlistResp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(playlistResp.Body)
 		slog.Error("get playlist request failed", "status", playlistResp.StatusCode, "body", string(b))
+		if playlistResp.StatusCode == http.StatusNotFound {
+			return queries.Playlist{}, fmt.Errorf("playlist not found: make sure the playlist is public and the URL is correct")
+		}
 		return queries.Playlist{}, fmt.Errorf("get playlist request failed: status %d", playlistResp.StatusCode)
 	}
 

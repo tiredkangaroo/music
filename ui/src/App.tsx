@@ -168,6 +168,7 @@ function NewPlaylistDialog(props: {
   const newPlaylistNameRef = useRef<HTMLInputElement>(null);
   const newPlaylistDescriptionRef = useRef<HTMLTextAreaElement>(null);
   const importPlaylistURLInputRef = useRef<HTMLInputElement>(null);
+  const [importPlaylistLoading, setImportPlaylistLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   async function handleCreatePlaylist() {
@@ -220,11 +221,18 @@ function NewPlaylistDialog(props: {
       setErrorMessage("please enter a playlist URL");
       return;
     }
-    importPlaylist(url).then((resp: PlaylistHead) => {
+    setImportPlaylistLoading(true);
+    importPlaylist(url).then((resp) => {
+      if (resp.error) {
+        setErrorMessage(resp.error);
+        setImportPlaylistLoading(false);
+        return;
+      }
       setPlaylists([resp, ...playlists]);
       setErrorMessage("");
       setSelectedPlaylist(resp.id);
       newPlaylistDialogRef.current?.close();
+      setImportPlaylistLoading(false);
     });
   }
   return (
@@ -387,10 +395,35 @@ function NewPlaylistDialog(props: {
             ref={importPlaylistURLInputRef}
           ></input>
           <button
-            className="bg-green-700 text-white px-4 py-2 rounded mt-4 w-full"
+            className="bg-green-700 text-white px-4 py-2 rounded mt-4 w-full disabled:opacity-50"
             onClick={handleImportPlaylist}
+            disabled={importPlaylistLoading}
           >
-            Import Playlist
+            {importPlaylistLoading ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                className="animate-spin mx-auto"
+              >
+                <path d="M12 2v4" />
+                <path d="m16.2 7.8 2.9-2.9" />
+                <path d="M18 12h4" />
+                <path d="m16.2 16.2 2.9 2.9" />
+                <path d="M12 18v4" />
+                <path d="m4.9 19.1 2.9-2.9" />
+                <path d="M2 12h4" />
+                <path d="m4.9 4.9 2.9 2.9" />
+              </svg>
+            ) : (
+              "Import Playlist"
+            )}
           </button>
         </div>
       </div>

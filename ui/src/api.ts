@@ -36,7 +36,9 @@ export async function createPlaylist(
   return res.json();
 }
 
-export async function importPlaylist(playlistURL: string) {
+export async function importPlaylist(
+  playlistURL: string,
+): Promise<WithError<PlaylistHead>> {
   const res = await fetch(`${API_BASE}/playlists/import`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
