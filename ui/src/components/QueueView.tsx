@@ -34,7 +34,7 @@ export function QueueView(props: {
           </svg>
         </button>
       </div>
-      <div className="pl-1">
+      <div className="">
         {playerState.currentTrack && (
           <div className="flex flex-col gap-4 mb-4">
             <h2 className="text-xl font-bold">Currently Playing: </h2>
@@ -47,37 +47,104 @@ export function QueueView(props: {
         ) : (
           <div className="flex flex-col gap-4">
             {playerState.queuedTracks.map((track, index) => (
-              <TrackView
-                key={index}
-                track={track}
-                customOnClick={async () => {
-                  // modify queue so that all tracks before currently clicked track are appended to previous as well as the currently playing track
-                  // then make the clicked track the currently playing and all the followed it in the queue to make up the rest of the queue
-                  const playID = await recordPlay(track.track_id);
-                  console.log(
-                    "recording play as a result of clicking track in queue",
-                    playID,
-                  );
-                  setPlayerState({
-                    currentTrack: track,
-                    isPlaying: true,
-                    currentTime: 0,
-                    duration: track.duration,
-                    queuedTracks: playerState.queuedTracks.slice(index + 1),
-                    repeat: "off",
-                    previousTracks: playerState.previousTracks
-                      .concat(
-                        playerState.currentTrack
-                          ? [playerState.currentTrack]
-                          : [],
-                      )
-                      .concat(playerState.queuedTracks.slice(0, index)),
-                    fromPlaylist: null,
-                    shuffle: false,
-                    playID: playID,
-                  });
-                }}
-              />
+              <div className="flex flex-row gap-2">
+                {/* reorder buttons */}
+
+                <div className="flex flex-col justify-between gap-2">
+                  {index > 0 && (
+                    <button
+                      onClick={() => {
+                        // move track up
+                        if (index === 0) return; // already at top
+                        const newQueue = [...playerState.queuedTracks];
+                        const temp = newQueue[index - 1];
+                        newQueue[index - 1] = newQueue[index];
+                        newQueue[index] = temp;
+                        setPlayerState({
+                          ...playerState,
+                          queuedTracks: newQueue,
+                        });
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        className="w-6"
+                      >
+                        <path d="m18 15-6-6-6 6" />
+                      </svg>
+                    </button>
+                  )}
+
+                  {index < playerState.queuedTracks.length - 1 && (
+                    <button
+                      onClick={() => {
+                        // move track down
+                        if (index === playerState.queuedTracks.length - 1)
+                          return; // already at bottom
+                        const newQueue = [...playerState.queuedTracks];
+                        const temp = newQueue[index + 1];
+                        newQueue[index + 1] = newQueue[index];
+                        newQueue[index] = temp;
+                        setPlayerState({
+                          ...playerState,
+                          queuedTracks: newQueue,
+                        });
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        className="w-6"
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <TrackView
+                  key={index}
+                  track={track}
+                  className="w-full"
+                  customOnClick={async () => {
+                    // modify queue so that all tracks before currently clicked track are appended to previous as well as the currently playing track
+                    // then make the clicked track the currently playing and all the followed it in the queue to make up the rest of the queue
+                    const playID = await recordPlay(track.track_id);
+                    console.log(
+                      "recording play as a result of clicking track in queue",
+                      playID,
+                    );
+                    setPlayerState({
+                      currentTrack: track,
+                      isPlaying: true,
+                      currentTime: 0,
+                      duration: track.duration,
+                      queuedTracks: playerState.queuedTracks.slice(index + 1),
+                      repeat: "off",
+                      previousTracks: playerState.previousTracks
+                        .concat(
+                          playerState.currentTrack
+                            ? [playerState.currentTrack]
+                            : [],
+                        )
+                        .concat(playerState.queuedTracks.slice(0, index)),
+                      fromPlaylist: null,
+                      shuffle: false,
+                      playID: playID,
+                    });
+                  }}
+                />
+              </div>
             ))}
           </div>
         )}

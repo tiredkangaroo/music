@@ -7,13 +7,17 @@ export function TrackView(props: {
   addTrack?: () => void;
   removeTrack?: () => void;
   customOnClick?: () => void;
+  className?: string;
 }) {
   const playerState = useContext(PlayerContext);
   const setPlayerState = useContext(SetPlayerContext);
   const { track } = props;
   return (
     <div
-      className="p-4 border-t-3 border-l-3 border-r-6 border-b-6 border-gray-300 cursor-pointer"
+      className={
+        "p-4 border-t-3 border-l-3 border-r-6 border-b-6 border-gray-300 cursor-pointer " +
+        (props.className ?? "")
+      }
       // play track on click (resetting the queue)
       onClick={async () => {
         if (props.customOnClick) {
