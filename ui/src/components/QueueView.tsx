@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { PlayerContext, SetPlayerContext } from "../PlayerContext";
 import { TrackView } from "./Track";
 import { recordPlay } from "../api";
@@ -9,6 +9,9 @@ export function QueueView(props: {
 }) {
   const playerState = useContext(PlayerContext);
   const setPlayerState = useContext(SetPlayerContext);
+
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   if (!props.isOpen) {
     return null;
@@ -47,78 +50,58 @@ export function QueueView(props: {
         ) : (
           <div className="flex flex-col gap-4">
             {playerState.queuedTracks.map((track, index) => (
-              <div className="flex flex-row gap-2">
-                {/* reorder buttons */}
+              <div
+                key={track.track_id || index}
+                className="flex flex-row gap-2"
+                style={{
+                  opacity: draggedIndex === index ? 0.5 : 1,
+                  scale: draggedIndex === index ? 0.95 : 1,
+                  // width: draggedIndex === index ? 0 : "100%",
+                  // height: draggedIndex === index ? 1 : "auto",
+                  borderWidth: dragOverIndex === index ? 2 : 0,
+                  borderColor:
+                    dragOverIndex === index ? "rgb(59 130 246)" : "transparent",
+                }}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", index.toString());
+                  setDraggedIndex(index);
+                }}
+                onDragEnd={(e) => {
+                  setDraggedIndex(null);
+                  setDragOverIndex(null);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setDragOverIndex(index);
+                }}
+                onDragLeave={(e) => {
+                  setDragOverIndex(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const draggedIndex = parseInt(
+                    e.dataTransfer.getData("text/plain"),
+                  );
 
-                <div className="flex flex-col justify-between gap-2">
-                  {index > 0 && (
-                    <button
-                      onClick={() => {
-                        // move track up
-                        if (index === 0) return; // already at top
-                        const newQueue = [...playerState.queuedTracks];
-                        const temp = newQueue[index - 1];
-                        newQueue[index - 1] = newQueue[index];
-                        newQueue[index] = temp;
-                        setPlayerState({
-                          ...playerState,
-                          queuedTracks: newQueue,
-                        });
-                      }}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        className="w-6"
-                      >
-                        <path d="m18 15-6-6-6 6" />
-                      </svg>
-                    </button>
-                  )}
+                  if (draggedIndex === index) return;
 
-                  {index < playerState.queuedTracks.length - 1 && (
-                    <button
-                      onClick={() => {
-                        // move track down
-                        if (index === playerState.queuedTracks.length - 1)
-                          return; // already at bottom
-                        const newQueue = [...playerState.queuedTracks];
-                        const temp = newQueue[index + 1];
-                        newQueue[index + 1] = newQueue[index];
-                        newQueue[index] = temp;
-                        setPlayerState({
-                          ...playerState,
-                          queuedTracks: newQueue,
-                        });
-                      }}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        className="w-6"
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
+                  const newQueue = [...playerState.queuedTracks];
+                  const [draggedTrack] = newQueue.splice(draggedIndex, 1);
+                  newQueue.splice(index, 0, draggedTrack);
+
+                  setPlayerState({
+                    ...playerState,
+                    queuedTracks: newQueue,
+                  });
+                }}
+              >
                 <TrackView
-                  key={index}
                   track={track}
-                  className="w-full"
+                  className="w-full cursor-move"
                   customOnClick={async () => {
-                    // modify queue so that all tracks before currently clicked track are appended to previous as well as the currently playing track
-                    // then make the clicked track the currently playing and all the followed it in the queue to make up the rest of the queue
                     const playID = await recordPlay(track.track_id);
                     console.log(
                       "recording play as a result of clicking track in queue",
