@@ -17,7 +17,7 @@ export function QueueView(props: {
     return null;
   }
   return (
-    <div className="w-fit bg-gray-100 border-l-4 border-black p-4 overflow-y-auto">
+    <div className="w-[30vw] min-w-fit bg-gray-100 border-l-4 border-black p-4 overflow-y-auto">
       <div className="w-full flex flex-row justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Queue</h1>
         <button onClick={() => props.setIsOpen(false)}>
@@ -37,7 +37,7 @@ export function QueueView(props: {
           </svg>
         </button>
       </div>
-      <div className="">
+      <div className="overflow-y-auto max-h-[60vh]">
         {playerState.currentTrack && (
           <div className="flex flex-col gap-4 mb-4">
             <h2 className="text-xl font-bold">Currently Playing: </h2>

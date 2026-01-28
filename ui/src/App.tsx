@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import type { PlayerState, Playlist, PlaylistHead } from "./types";
+import type { PlayerState, Playlist, PlaylistHead, Track } from "./types";
 import {
   createPlaylist,
   getPlaylist,
   importPlaylist,
   listPlaylists,
+  searchTracks,
   uploadImage,
 } from "./api";
 import { PlaylistHeadView } from "./components/PlaylistHead";
@@ -16,6 +17,7 @@ import {
   SetCriticalErrorContext,
 } from "./CriticalErrorContext";
 import { QueueView } from "./components/QueueView";
+import { TrackView } from "./components/Track";
 
 export default function App() {
   const [playlists, setPlaylists] = useState<PlaylistHead[]>([]);
@@ -122,34 +124,131 @@ function Sidebar(props: {
 }) {
   const { playlists, setPlaylists, selectPlaylist } = props;
   const newPlaylistDialogRef = useRef<HTMLDialogElement>(null);
+  const [sidebarView, setSidebarView] = useState<"library" | "search">(
+    "library",
+  );
+
+  const searchTracksInputRef = useRef<HTMLInputElement>(null);
+  const [searchResults, setSearchResults] = useState<Track[]>([]);
+  function handleSearchInput() {
+    const query = searchTracksInputRef.current!.value;
+    if (query.length === 0) {
+      setSearchResults([]);
+      return;
+    }
+    searchTracks(query).then((results) => {
+      setSearchResults(results);
+    });
+  }
 
   return (
-    <div className="md:w-[18%] w-full md:h-full h-fit bg-white md:border-r-8 md:border-t-8 md:border-r-black px-2 py-4">
-      <NewPlaylistDialog
-        playlists={playlists}
-        setPlaylists={setPlaylists}
-        newPlaylistDialogRef={newPlaylistDialogRef}
-        setSelectedPlaylist={props.selectPlaylist}
-      />
-      <div className="w-full flex md:flex-col flex-col md:justify-between gap-4">
-        <h1 className="text-4xl">Library</h1>
-        <button
-          className="text-2xl font-bold py-1 px-3 bg-[#bfdbff] border-black border-t-2 border-l-2 border-r-4 border-4"
-          onClick={() => newPlaylistDialogRef.current?.showModal()}
-        >
-          +
-        </button>
-      </div>
-      <div className="mt-4 flex flex-col gap-4 overflow-y-auto h-[80vh] px-6">
-        {playlists.map((playlist) => (
-          <div
-            className="w-full"
-            onClick={() => selectPlaylist(playlist.id)}
-            key={playlist.id}
-          >
-            <PlaylistHeadView playlist={playlist} />
+    <div className="w-fit max-w-[30%] bg-white md:border-r-8 md:border-t-8 md:border-r-black px-2 pt-4 pb-1 flex flex-col justify-between h-screen">
+      {sidebarView === "library" && (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <NewPlaylistDialog
+            playlists={playlists}
+            setPlaylists={setPlaylists}
+            newPlaylistDialogRef={newPlaylistDialogRef}
+            setSelectedPlaylist={props.selectPlaylist}
+          />
+          <div className="w-full flex md:flex-col flex-col md:justify-between gap-4">
+            <h1 className="text-4xl">Library</h1>
+            <button
+              className="text-2xl font-bold py-1 px-3 bg-[#bfdbff] border-black border-t-2 border-l-2 border-r-4 border-4"
+              onClick={() => newPlaylistDialogRef.current?.showModal()}
+            >
+              +
+            </button>
           </div>
-        ))}
+          <div className="mt-4 flex flex-col gap-4 overflow-y-auto flex-1 px-6">
+            {playlists.map((playlist) => (
+              <div
+                className="w-full"
+                onClick={() => selectPlaylist(playlist.id)}
+                key={playlist.id}
+              >
+                <PlaylistHeadView playlist={playlist} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {sidebarView === "search" && (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <h1 className="text-2xl font-bold">Search</h1>
+          <input
+            className="mt-4 p-2 border border-black w-full px-8"
+            placeholder="Search for tracks"
+            ref={searchTracksInputRef}
+            onInput={handleSearchInput}
+          />
+          <div className="mt-4 flex-1 overflow-y-auto px-2 flex flex-col gap-4">
+            {searchResults.length === 0 && (
+              <p className="text-gray-600">no results</p>
+            )}
+            {searchResults.map((track) => (
+              <TrackView track={track} key={track.track_id} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-row gap-2 items-center justify-center m-0 px-2 py-2 border-l-2 border-t-2 border-r-6 border-b-6 border-black bg-transparent">
+        <button
+          onClick={() => {
+            setSidebarView("search");
+          }}
+          className="bg-blue-300 p-2 border-l-2 border-t-2 border-black"
+          style={{
+            scale: sidebarView === "search" ? 1 : 0.95,
+            borderRightWidth: sidebarView === "search" ? "4px" : "6px",
+            borderBottomWidth: sidebarView === "search" ? "4px" : "6px",
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="m21 21-4.34-4.34" />
+            <circle cx="11" cy="11" r="8" />
+          </svg>
+        </button>
+        <button
+          onClick={() => {
+            setSidebarView("library");
+          }}
+          className="bg-blue-300 p-2 border-l-2 border-t-2 border-r-6 border-b-6 border-black"
+          style={{
+            scale: sidebarView === "library" ? 1 : 0.95,
+            borderRightWidth: sidebarView === "library" ? "4px" : "6px",
+            borderBottomWidth: sidebarView === "library" ? "4px" : "6px",
+            // borderWidth: sidebarView === "library" ? "6px" : "4px",
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="m16 6 4 14" />
+            <path d="M12 6v14" />
+            <path d="M8 8v12" />
+            <path d="M4 4v16" />
+          </svg>
+        </button>
       </div>
     </div>
   );
@@ -441,8 +540,11 @@ function MainContent(props: {
 
   if (!playlist) {
     return (
-      <div className="flex-1 flex flex-col justify-center items-center">
-        <h1 className="text-4xl font-bold">select a playlist</h1>
+      <div className="flex flex-col w-full h-screen">
+        <div className="flex-1 flex flex-col justify-center items-center">
+          <h1 className="text-4xl font-bold">select a playlist</h1>
+        </div>
+        <Player isQueueOpen={isQueueOpen} setIsQueueOpen={setIsQueueOpen} />
       </div>
     );
   }

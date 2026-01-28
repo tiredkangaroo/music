@@ -120,18 +120,21 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 // and downloads it if it is missing. It is intended to be slightly cheaper than Download
 // because it does not run spotdl and does not update the database and extract metadata if
 // the track already exists.
-func (l *Library) DownloadIfNotExists(ctx context.Context, trackIDs ...string) error {
+func (l *Library) DownloadIfNotExists(trackIDs ...string) error {
+	// using ctx.Background() in this function since download if not exists is called
+	// in a goroutine and we shouldn't pass down a request context to pass down
+
 	for i, trackID := range trackIDs {
 		p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
 		if _, err := os.Stat(p); os.IsNotExist(err) {
-			if err := l.Download(ctx, []string{"https://open.spotify.com/track/" + trackID}); err != nil {
+			if err := l.Download(context.Background(), []string{"https://open.spotify.com/track/" + trackID}); err != nil {
 				slog.Error("download track", "error", err, "track_id", trackID)
 				return fmt.Errorf("download track %s (successfully downloaded %d/%d): %w", trackID, i, len(trackIDs), err)
 			}
 		}
 	}
 	for _, id := range trackIDs {
-		if err := l.queries.MarkTrackAsDownloaded(ctx, id); err != nil {
+		if err := l.queries.MarkTrackAsDownloaded(context.Background(), id); err != nil {
 			slog.Error("mark track as downloaded", "error", err, "track_id", id)
 		}
 	}
@@ -177,7 +180,7 @@ func (l *Library) AddTrackToPlaylist(ctx context.Context, playlistID, trackID st
 	if err != nil {
 		return fmt.Errorf("invalid playlist id: %w", err)
 	}
-	go l.DownloadIfNotExists(ctx, trackID) // best effort download, ignore error, work in a seperate goroutine
+	go l.DownloadIfNotExists(trackID) // best effort download, ignore error, work in a seperate goroutine
 	return l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
 		PlaylistID: optuuid(pid),
 		TrackID:    trackID,

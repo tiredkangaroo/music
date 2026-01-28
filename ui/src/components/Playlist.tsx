@@ -39,7 +39,7 @@ export function PlaylistView(props: {
             className="w-48 h-48 object-cover"
           />
           <div className="flex flex-col w-full justify-between">
-            <div>
+            <div className="w-full wrap-break-word">
               <h1 className="text-5xl font-bold">{playlist.name}</h1>
               <p className="mt-4 text-lg">{playlist.description}</p>
             </div>

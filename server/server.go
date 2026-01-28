@@ -189,7 +189,7 @@ func (s *Server) Serve() error {
 		if trackID == "" {
 			return c.JSON(400, errormap("trackID parameter is required"))
 		}
-		err := s.lib.DownloadIfNotExists(c.Request().Context(), trackID)
+		err := s.lib.DownloadIfNotExists(trackID)
 		if err != nil {
 			return c.JSON(500, errormap(err.Error()))
 		}
