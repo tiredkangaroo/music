@@ -17,6 +17,7 @@ type Environment struct {
 	KeyPath             string
 	PostgresURL         string
 	DataPath            string
+	// GeniusAPIToken      string
 }
 
 var DefaultEnv = Environment{

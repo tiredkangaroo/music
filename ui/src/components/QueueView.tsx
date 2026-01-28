@@ -68,7 +68,7 @@ export function QueueView(props: {
                   e.dataTransfer.setData("text/plain", index.toString());
                   setDraggedIndex(index);
                 }}
-                onDragEnd={(e) => {
+                onDragEnd={() => {
                   setDraggedIndex(null);
                   setDragOverIndex(null);
                 }}
@@ -77,7 +77,7 @@ export function QueueView(props: {
                   e.dataTransfer.dropEffect = "move";
                   setDragOverIndex(index);
                 }}
-                onDragLeave={(e) => {
+                onDragLeave={() => {
                   setDragOverIndex(null);
                 }}
                 onDrop={(e) => {

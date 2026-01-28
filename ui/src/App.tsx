@@ -437,6 +437,7 @@ function MainContent(props: {
 }) {
   const { playlist } = props;
   const [isQueueOpen, setIsQueueOpen] = useState<boolean>(false);
+  const [lyricsOpen, setIsLyricsOpen] = useState<boolean>(false);
 
   if (!playlist) {
     return (
@@ -449,7 +450,13 @@ function MainContent(props: {
     <div className="flex flex-col w-full h-screen">
       <div className="flex-1 min-h-0 flex flex-row">
         <PlaylistView playlist={playlist} setPlaylist={props.setPlaylist} />
-        <QueueView isOpen={isQueueOpen} setIsOpen={setIsQueueOpen} />
+        <QueueView
+          isOpen={isQueueOpen}
+          setIsOpen={(v) => {
+            setIsLyricsOpen(false);
+            setIsQueueOpen(v);
+          }}
+        />
       </div>
       <Player isQueueOpen={isQueueOpen} setIsQueueOpen={setIsQueueOpen} />
     </div>

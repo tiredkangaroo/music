@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -338,21 +338,48 @@ func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTra
 	}
 
 	slices.SortFunc(results, func(a, b queries.SearchTrackByNameRow) int {
-		// sort by exact name match first and popularity
-		weight := math.Min(math.Abs(float64(len(a.TrackName)-len(query)))-math.Abs(float64(len(b.TrackName)-len(query))), 5) // closer length to query is better
-		// a is closer? negative weight, a is better
-		// b is closer? positive weight, b is better
-		// weight is capped at 5 to prevent popularity from being overshadowed too much
+		// exact matches
+		// on a side note: i love you go for having a built in equal function that does unicode case folding
+		// to the go devs, i sincerely hope you live happy and fulfilling lives
+		// - aj
+		aExactMatch := strings.EqualFold(a.TrackName, query)
+		bExactMatch := strings.EqualFold(b.TrackName, query)
+		if aExactMatch != bExactMatch {
+			if aExactMatch {
+				return -1
+			}
+			return 1
+		}
 
-		// include popularity in the weight, higher popularity is better
-		weight -= math.Min(float64(a.Popularity-b.Popularity), 50) / 10 // a is more popular? subtract from weight, making a better
-		// if weight is negative, a is better than b
-		// if weight is positive, b is better than a
-		// popularity difference is capped at 5 to prevent it from overshadowing name length too much
-		// divided by x to reduce its impact compared to name length, a 20 popularity difference is equivalent to 2 character length difference if x=10
-		// this number should be tuned for best results
+		// where the query appears at the start
+		aStartsWith := strings.HasPrefix(strings.ToLower(a.TrackName), strings.ToLower(query))
+		bStartsWith := strings.HasPrefix(strings.ToLower(b.TrackName), strings.ToLower(query))
+		if aStartsWith != bStartsWith {
+			if aStartsWith {
+				return -1
+			}
+			return 1
+		}
 
-		return int(weight)
+		// popularity
+		if a.Popularity != b.Popularity {
+			return int(b.Popularity - a.Popularity)
+		}
+
+		// recency
+		if a.TrackReleaseDate.Valid && b.TrackReleaseDate.Valid {
+			aTime := a.TrackReleaseDate.Time
+			bTime := b.TrackReleaseDate.Time
+			if !aTime.Equal(bTime) {
+				if aTime.After(bTime) {
+					return -1
+				}
+				return 1
+			}
+		}
+
+		// alphabetical by track name (will almost never reach here)
+		return strings.Compare(a.TrackName, b.TrackName)
 	})
 	return results, nil
 }
@@ -479,8 +506,8 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (queries
 
 func releaseDate(d string) pgtype.Date {
 	var track_date pgtype.Date
+	yr, _ := strconv.Atoi(d)
 	if len(d) == 4 { // year only
-		yr, _ := strconv.Atoi(d)
 		track_date = pgtype.Date{Time: time.Date(yr, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true}
 	} else if len(d) == 10 { // date only
 		t, err := time.Parse(time.DateOnly, d)
