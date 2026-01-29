@@ -36,24 +36,40 @@ type Library struct {
 // Download downloads tracks, albums or playlists specified in things slice. A thing can be a
 // link to a spotify track, album or playlist, or it can be a search query like
 // "Blinding Lights - The Weeknd".
-func (l *Library) Download(ctx context.Context, things []string) error {
+func (l *Library) Download(ctx context.Context, thing string) error {
 	if env.DefaultEnv.Debug {
-		slog.Debug("downloading", "things", things)
+		slog.Debug("downloading", "thing", thing)
 	}
-	args := []string{"download"}
-	args = append(args, things...)
-	args = append(args, "--save-file", "metadata.spotdl", "--output", "{track-id}", "--format", "m4a", "--bitrate", "auto")
-	args = append(args, "--client-id", env.DefaultEnv.SpotifyClientID, "--client-secret", env.DefaultEnv.SpotifyClientSecret)
+	// steps: spotdl url and metadata download
+	// read youtube url (split by \n, idx 1) then read metadata and insert into db
+	// then use yt-dlp to download audio files
+	// spotdl url [thing] --save-file metadata.spotdl --client-id [client id] --client-secret [client secret]
+	args := []string{"url"}
+	args = append(args, thing)
+	args = append(args, "--save-file", filepath.Join(l.storagePath, "metadata.spotdl"))
+	args = append(args, "--client-id", env.DefaultEnv.SpotifyClientID)
+	args = append(args, "--client-secret", env.DefaultEnv.SpotifyClientSecret)
 
 	logs := new(bytes.Buffer)
 	cmd := exec.Command(env.DefaultEnv.PathToSpotDL, args...)
 	cmd.Stdout = logs
-	cmd.Stderr = logs
 	cmd.Dir = l.storagePath
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("spotdl command failed: %w\nlogs: %s", err, logs.String())
 	}
+	logsSplit := strings.Split(logs.String(), "\n")
+	if len(logsSplit) < 2 {
+		return fmt.Errorf("spotdl output too short: %s", logs.String())
+	}
+	youtubeURL := logsSplit[1]
+	fmt.Println("youtube url:", youtubeURL)
+
+	args[0] = "save"
+	if err := exec.Command(env.DefaultEnv.PathToSpotDL, args...).Run(); err != nil {
+		return fmt.Errorf("spotdl save command failed: %w", err)
+	}
+
 	mdfile := filepath.Join(l.storagePath, "metadata.spotdl")
 	defer os.Remove(mdfile)
 
@@ -80,39 +96,53 @@ func (l *Library) Download(ctx context.Context, things []string) error {
 	if err != nil {
 		return err
 	}
+	if len(metadataList) == 0 {
+		return fmt.Errorf("no metadata found in spotdl output")
+	}
 
-	tx, err := l.pool.Begin(ctx)
+	m := metadataList[0]
+	track_date := releaseDate(m.Date)
+	err = l.queries.InsertTrack(context.Background(), queries.InsertTrackParams{
+		ArtistID:         m.ArtistID,
+		ArtistName:       m.Artist,
+		Artists:          m.Artists,
+		AlbumID:          m.AlbumID,
+		AlbumName:        m.AlbumName,
+		CoverUrl:         m.CoverURL,
+		AlbumReleaseDate: pgtype.Date{},
+		TrackID:          m.ID,
+		TrackName:        m.Name,
+		Duration:         m.Duration,
+		Popularity:       m.Popularity,
+		TrackReleaseDate: track_date,
+		Downloaded:       true,
+	})
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	q := l.queries.WithTx(tx)
-	for _, m := range metadataList {
-		track_date := releaseDate(m.Date)
-		err = q.InsertTrack(context.Background(), queries.InsertTrackParams{
-			ArtistID:         m.ArtistID,
-			ArtistName:       m.Artist,
-			Artists:          m.Artists,
-			AlbumID:          m.AlbumID,
-			AlbumName:        m.AlbumName,
-			CoverUrl:         m.CoverURL,
-			AlbumReleaseDate: pgtype.Date{},
-			TrackID:          m.ID,
-			TrackName:        m.Name,
-			Duration:         m.Duration,
-			Popularity:       m.Popularity,
-			TrackReleaseDate: track_date,
-			Downloaded:       true,
-		})
-		if err != nil {
-			return fmt.Errorf("insert track: %w", err)
-		}
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit tx: %w", err)
+		return fmt.Errorf("insert track: %w", err)
 	}
 
+	// download audio using yt-dlp
+	ydlArgs := []string{
+		"-x",
+		"--audio-format", "m4a",
+		"--output", filepath.Join(l.storagePath, fmt.Sprintf("%s.m4a", m.ID)),
+		"--extractor-args", "youtube:player_client=default,ios,-android_sdkless;formats=missing_pot",
+		"--format", "bv[protocol=m3u8_native]+ba[protocol=m3u8_native]/b[protocol=m3u8_native]",
+	}
+	ydlArgs = append(ydlArgs, youtubeURL)
+
+	ydlLogs := new(bytes.Buffer)
+	ydlCmd := exec.Command("yt-dlp", ydlArgs...)
+	ydlCmd.Stdout = ydlLogs
+	ydlCmd.Stderr = ydlLogs
+	ydlCmd.Dir = l.storagePath
+
+	if err := ydlCmd.Run(); err != nil {
+		return fmt.Errorf("yt-dlp command failed: %w\nlogs: %s", err, ydlLogs.String())
+	}
+	if env.DefaultEnv.Debug {
+		slog.Debug("downloaded", "track_id", m.ID)
+	}
 	return nil
 }
 
@@ -127,7 +157,7 @@ func (l *Library) DownloadIfNotExists(trackIDs ...string) error {
 	for i, trackID := range trackIDs {
 		p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
 		if _, err := os.Stat(p); os.IsNotExist(err) {
-			if err := l.Download(context.Background(), []string{"https://open.spotify.com/track/" + trackID}); err != nil {
+			if err := l.Download(context.Background(), "https://open.spotify.com/track/"+trackID); err != nil {
 				slog.Error("download track", "error", err, "track_id", trackID)
 				return fmt.Errorf("download track %s (successfully downloaded %d/%d): %w", trackID, i, len(trackIDs), err)
 			}
@@ -219,7 +249,7 @@ func (l *Library) Play(ctx context.Context, trackID string) (io.ReadCloser, erro
 	}
 
 	// file not found, re-download
-	if err := l.Download(ctx, []string{"https://open.spotify.com/track/" + trackID}); err != nil {
+	if err := l.Download(ctx, "https://open.spotify.com/track/"+trackID); err != nil {
 		slog.Error("download track", "error", err, "track_id", trackID)
 		return nil, fmt.Errorf("download track: %w", err)
 	}
@@ -480,14 +510,8 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (queries
 		return queries.Playlist{}, fmt.Errorf("create playlist in library: %w", err)
 	}
 
-	// best effort download, ignore error
-	// must be done before adding tracks to playlist to ensure the tracks exist (avoid foreign key violation)
-	err = l.Download(ctx, []string{"https://open.spotify.com/playlist/" + spotifyPlaylistID})
-	if err != nil {
-		slog.Error("download playlist during import", "error", err, "playlist_id", playlistID, "spotify_playlist_id", spotifyPlaylistID)
-	}
-
 	for _, track := range tracks {
+		go l.DownloadIfNotExists(track.TrackID) // best effort download in background
 		// not using AddTrackToPlaylist to avoid spawning multiple download goroutines
 		err := l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
 			PlaylistID: optuuid(uuid.MustParse(playlistID)),

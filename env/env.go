@@ -8,6 +8,7 @@ import (
 type Environment struct {
 	Debug               bool
 	PathToSpotDL        string
+	PathToYtDL          string
 	SpotifyClientID     string
 	SpotifyClientSecret string
 	ServerAddress       string
@@ -23,6 +24,7 @@ type Environment struct {
 var DefaultEnv = Environment{
 	Debug:               dv(os.Getenv("DEBUG"), "false") == "true",
 	PathToSpotDL:        os.Getenv("SPOTDL_PATH"),
+	PathToYtDL:          dv(os.Getenv("YT_DLP_PATH"), "yt-dlp"),
 	SpotifyClientID:     os.Getenv("SPOTIFY_CLIENT_ID"),
 	SpotifyClientSecret: os.Getenv("SPOTIFY_CLIENT_SECRET"),
 	ServerAddress:       dv(os.Getenv("SERVER_ADDRESS"), ":8080"),

@@ -8,16 +8,29 @@ export function TrackView(props: {
   removeTrack?: () => void;
   customOnClick?: () => void;
   className?: string;
+  compact?: boolean;
 }) {
   const playerState = useContext(PlayerContext);
   const setPlayerState = useContext(SetPlayerContext);
-  const { track } = props;
+  const { track, compact } = props;
+
+  function shortText(text: string, maxLength: number): string {
+    if (text.length <= maxLength) {
+      return text;
+    }
+    return text.slice(0, maxLength - 3) + "...";
+  }
+
   return (
     <div
-      className={
-        "p-4 border-t-3 border-l-3 border-r-6 border-b-6 border-gray-300 cursor-pointer " +
-        (props.className ?? "")
-      }
+      style={{
+        padding: compact ? "8px" : "16px",
+        borderLeft: compact ? "1px solid gray" : "3px solid gray",
+        borderRight: compact ? "2px solid gray" : "6px solid gray",
+        borderTop: compact ? "1px solid gray" : "3px solid gray",
+        borderBottom: compact ? "2px solid gray" : "6px solid gray",
+      }}
+      className={"cursor-pointer " + (props.className ?? "")}
       // play track on click (resetting the queue)
       onClick={async () => {
         if (props.customOnClick) {
@@ -47,45 +60,55 @@ export function TrackView(props: {
       }}
     >
       <div className="flex flex-row justify-between items-center">
-        <div className="flex flex-row gap-4 ">
+        <div className="flex flex-row gap-4">
           <img src={track.cover_url} className="w-12 object-contain" />
           <div>
-            <h3 className="text-xl font-medium">{track.track_name}</h3>
+            <h3
+              style={{
+                fontSize: compact ? "1rem" : "1.25rem",
+              }}
+              className="font-medium"
+              title={track.track_name}
+            >
+              {shortText(track.track_name, compact ? 15 : 30)}
+            </h3>
             <p className="text-sm text-gray-600">{track.artists.join(", ")}</p>
           </div>
         </div>
         <div className="flex flex-col gap-2 items-end justify-center">
           <div className="flex flex-row gap-2 items-center">
-            <div
-              title={props.track.downloaded ? "Downloaded" : "Not Downloaded"}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!props.track.downloaded) {
-                  // request download
-                  requestDownload(props.track.track_id).catch((err) => {
-                    console.error("failed to request download:", err);
-                  });
-                }
-              }}
-            >
-              {props.track.downloaded !== undefined && (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={props.track.downloaded ? "#28ed53" : "#363636"}
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M12 17V3" />
-                  <path d="m6 11 6 6 6-6" />
-                  <path d="M19 21H5" />
-                </svg>
-              )}
-            </div>
+            {!compact && (
+              <div
+                title={props.track.downloaded ? "Downloaded" : "Not Downloaded"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!props.track.downloaded) {
+                    // request download
+                    requestDownload(props.track.track_id).catch((err) => {
+                      console.error("failed to request download:", err);
+                    });
+                  }
+                }}
+              >
+                {props.track.downloaded !== undefined && (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={props.track.downloaded ? "#28ed53" : "#363636"}
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M12 17V3" />
+                    <path d="m6 11 6 6 6-6" />
+                    <path d="M19 21H5" />
+                  </svg>
+                )}
+              </div>
+            )}
             <span className="text-sm text-gray-500">
               {formatDuration(track.duration)}
             </span>

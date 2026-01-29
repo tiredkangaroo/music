@@ -145,7 +145,12 @@ function Sidebar(props: {
   }
 
   return (
-    <div className="w-fit max-w-[30%] bg-white md:border-r-8 md:border-t-8 md:border-r-black px-2 pt-4 pb-1 flex flex-col justify-between h-screen">
+    <div
+      className="bg-white md:border-r-8 md:border-t-8 md:border-r-black px-2 pt-4 pb-1 flex flex-col justify-between h-screen"
+      style={{
+        width: sidebarView === "library" ? "fit-content" : "30%",
+      }}
+    >
       {sidebarView === "library" && (
         <div className="flex-1 flex flex-col overflow-hidden">
           <NewPlaylistDialog
@@ -179,13 +184,36 @@ function Sidebar(props: {
       {sidebarView === "search" && (
         <div className="flex-1 flex flex-col overflow-hidden">
           <h1 className="text-2xl font-bold">Search</h1>
-          <div className="flex flex-row gap-2 items-center">
+          <div className="flex flex-row gap-2 items-center justify-center">
             <input
               className="mt-4 p-2 border border-black w-full px-4"
               placeholder="Search for tracks"
               ref={searchTracksInputRef}
               onInput={handleSearchInput}
             />
+            <button
+              onClick={() => {
+                if (!searchTracksInputRef.current) return;
+                searchTracksInputRef.current.value = "";
+                setSearchResults([]);
+                setLoadingSearch(false);
+              }}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="auto"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
           </div>
           {loadingSearch ? (
             <div className="mt-4 flex-1 flex justify-center items-center">
@@ -205,12 +233,12 @@ function Sidebar(props: {
               </svg>
             </div>
           ) : (
-            <div className="mt-4 flex-1 overflow-y-auto px-2 flex flex-col gap-4">
+            <div className="mt-4 flex-1 overflow-y-auto px-2 flex flex-col gap-2">
               {searchResults.length === 0 && (
                 <p className="text-gray-600">no results</p>
               )}
               {searchResults.map((track) => (
-                <TrackView track={track} key={track.track_id} />
+                <TrackView track={track} key={track.track_id} compact />
               ))}
             </div>
           )}
