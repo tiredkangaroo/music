@@ -305,6 +305,7 @@ function SearchDialog(props: {
                   });
                 });
               }}
+              compact
             />
           ))}
         </div>

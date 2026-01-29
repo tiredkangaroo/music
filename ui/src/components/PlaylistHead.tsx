@@ -1,8 +1,17 @@
 import type { PlaylistHead } from "../types";
-export function PlaylistHeadView(props: { playlist: PlaylistHead }) {
-  const { playlist } = props;
+export function PlaylistHeadView(props: {
+  playlist: PlaylistHead;
+  selected?: boolean;
+}) {
+  const { playlist, selected } = props;
   return (
-    <div className="p-2 gap-4 border-2 border-black w-full bg-white hover:bg-gray-100 flex flex-col content-center cursor-pointer">
+    <div
+      className="p-2 gap-4 border-r-4 border-b-4 border-l-2 border-t-2 w-full hover:opacity-80 flex flex-col content-center cursor-pointer"
+      style={{
+        borderColor: selected ? "#000" : "#9c9c9c",
+        backgroundColor: selected ? "#00000020" : "white",
+      }}
+    >
       <img
         src={playlist.image_url}
         alt={playlist.name}

@@ -77,6 +77,7 @@ export default function App() {
               <Sidebar
                 playlists={playlists}
                 setPlaylists={setPlaylists}
+                selectedPlaylist={selectedPlaylist}
                 selectPlaylist={selectPlaylist}
               />
               <MainContent
@@ -120,9 +121,10 @@ export default function App() {
 function Sidebar(props: {
   playlists: PlaylistHead[];
   setPlaylists: React.Dispatch<React.SetStateAction<PlaylistHead[]>>;
+  selectedPlaylist: Playlist | null;
   selectPlaylist: (id: string) => void;
 }) {
-  const { playlists, setPlaylists, selectPlaylist } = props;
+  const { playlists, setPlaylists, selectedPlaylist, selectPlaylist } = props;
   const newPlaylistDialogRef = useRef<HTMLDialogElement>(null);
   const [sidebarView, setSidebarView] = useState<"library" | "search">(
     "library",
@@ -175,7 +177,10 @@ function Sidebar(props: {
                 onClick={() => selectPlaylist(playlist.id)}
                 key={playlist.id}
               >
-                <PlaylistHeadView playlist={playlist} />
+                <PlaylistHeadView
+                  playlist={playlist}
+                  selected={selectedPlaylist?.id === playlist.id}
+                />
               </div>
             ))}
           </div>
