@@ -130,14 +130,17 @@ function Sidebar(props: {
 
   const searchTracksInputRef = useRef<HTMLInputElement>(null);
   const [searchResults, setSearchResults] = useState<Track[]>([]);
+  const [loadingSearch, setLoadingSearch] = useState<boolean>(false);
   function handleSearchInput() {
     const query = searchTracksInputRef.current!.value;
     if (query.length === 0) {
       setSearchResults([]);
       return;
     }
+    setLoadingSearch(true);
     searchTracks(query).then((results) => {
       setSearchResults(results);
+      setLoadingSearch(false);
     });
   }
 
@@ -176,20 +179,41 @@ function Sidebar(props: {
       {sidebarView === "search" && (
         <div className="flex-1 flex flex-col overflow-hidden">
           <h1 className="text-2xl font-bold">Search</h1>
-          <input
-            className="mt-4 p-2 border border-black w-full px-8"
-            placeholder="Search for tracks"
-            ref={searchTracksInputRef}
-            onInput={handleSearchInput}
-          />
-          <div className="mt-4 flex-1 overflow-y-auto px-2 flex flex-col gap-4">
-            {searchResults.length === 0 && (
-              <p className="text-gray-600">no results</p>
-            )}
-            {searchResults.map((track) => (
-              <TrackView track={track} key={track.track_id} />
-            ))}
+          <div className="flex flex-row gap-2 items-center">
+            <input
+              className="mt-4 p-2 border border-black w-full px-4"
+              placeholder="Search for tracks"
+              ref={searchTracksInputRef}
+              onInput={handleSearchInput}
+            />
           </div>
+          {loadingSearch ? (
+            <div className="mt-4 flex-1 flex justify-center items-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                className="animate-spin"
+              >
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            </div>
+          ) : (
+            <div className="mt-4 flex-1 overflow-y-auto px-2 flex flex-col gap-4">
+              {searchResults.length === 0 && (
+                <p className="text-gray-600">no results</p>
+              )}
+              {searchResults.map((track) => (
+                <TrackView track={track} key={track.track_id} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
