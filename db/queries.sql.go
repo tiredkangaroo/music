@@ -73,7 +73,8 @@ SELECT
                 'artists', t.artists,
                 'cover_url', a.cover_url,
                 'downloaded', t.downloaded,
-                'track_release_date', t.track_release_date
+                'track_release_date', t.track_release_date,
+                'lyrics', t.lyrics
             )
         ) FILTER (WHERE t.track_id IS NOT NULL),
         '[]'::json
@@ -110,7 +111,7 @@ func (q *Queries) GetPlaylist(ctx context.Context, id pgtype.UUID) (GetPlaylistR
 }
 
 const getTrackByID = `-- name: GetTrackByID :one
-SELECT track_id, track_name, duration, popularity, album_id, artist_id, artists, track_release_date, downloaded FROM tracks WHERE track_id = $1
+SELECT track_id, track_name, duration, popularity, album_id, artist_id, artists, track_release_date, downloaded, lyrics FROM tracks WHERE track_id = $1
 `
 
 func (q *Queries) GetTrackByID(ctx context.Context, trackID string) (Track, error) {
@@ -126,6 +127,7 @@ func (q *Queries) GetTrackByID(ctx context.Context, trackID string) (Track, erro
 		&i.Artists,
 		&i.TrackReleaseDate,
 		&i.Downloaded,
+		&i.Lyrics,
 	)
 	return i, err
 }
@@ -150,7 +152,8 @@ INSERT INTO tracks (
     artist_id,
     artists,
     track_release_date,
-    downloaded
+    downloaded,
+    lyrics
 )
 VALUES (
     $7,
@@ -161,9 +164,19 @@ VALUES (
     $1,
     $11,
     $12,
-    $13
+    $13,
+    $14
 )
-ON CONFLICT (track_id) DO NOTHING
+ON CONFLICT (track_id) DO UPDATE
+SET
+    track_name = EXCLUDED.track_name,
+    duration = EXCLUDED.duration,
+    popularity = EXCLUDED.popularity,
+    album_id = EXCLUDED.album_id,
+    artist_id = EXCLUDED.artist_id,
+    artists = EXCLUDED.artists,
+    track_release_date = EXCLUDED.track_release_date,
+    lyrics = EXCLUDED.lyrics
 `
 
 type InsertTrackParams struct {
@@ -180,6 +193,7 @@ type InsertTrackParams struct {
 	Artists          []string    `json:"artists"`
 	TrackReleaseDate pgtype.Date `json:"track_release_date"`
 	Downloaded       bool        `json:"downloaded"`
+	Lyrics           string      `json:"lyrics"`
 }
 
 func (q *Queries) InsertTrack(ctx context.Context, arg InsertTrackParams) error {
@@ -197,6 +211,7 @@ func (q *Queries) InsertTrack(ctx context.Context, arg InsertTrackParams) error 
 		arg.Artists,
 		arg.TrackReleaseDate,
 		arg.Downloaded,
+		arg.Lyrics,
 	)
 	return err
 }
@@ -305,7 +320,7 @@ func (q *Queries) RemoveTrackFromPlaylist(ctx context.Context, arg RemoveTrackFr
 }
 
 const searchTrackByName = `-- name: SearchTrackByName :many
-SELECT track_id, track_name, duration, popularity, tracks.album_id, tracks.artist_id, artists, track_release_date, downloaded, albums.album_id, album_name, albums.artist_id, cover_url, album_release_date, artists.artist_id, artist_name FROM tracks
+SELECT track_id, track_name, duration, popularity, tracks.album_id, tracks.artist_id, artists, track_release_date, downloaded, lyrics, albums.album_id, album_name, albums.artist_id, cover_url, album_release_date, artists.artist_id, artist_name FROM tracks
 JOIN albums ON tracks.album_id = albums.album_id
 JOIN artists ON tracks.artist_id = artists.artist_id
 WHERE track_name ILIKE '%' || $1 || '%'
@@ -328,6 +343,7 @@ type SearchTrackByNameRow struct {
 	Artists          []string    `json:"artists"`
 	TrackReleaseDate pgtype.Date `json:"track_release_date"`
 	Downloaded       bool        `json:"downloaded"`
+	Lyrics           string      `json:"lyrics"`
 	AlbumID_2        string      `json:"album_id_2"`
 	AlbumName        string      `json:"album_name"`
 	ArtistID_2       string      `json:"artist_id_2"`
@@ -356,6 +372,7 @@ func (q *Queries) SearchTrackByName(ctx context.Context, arg SearchTrackByNamePa
 			&i.Artists,
 			&i.TrackReleaseDate,
 			&i.Downloaded,
+			&i.Lyrics,
 			&i.AlbumID_2,
 			&i.AlbumName,
 			&i.ArtistID_2,

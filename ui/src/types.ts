@@ -12,6 +12,7 @@ export interface Track {
   album_release_date?: string;
   artist_name?: string;
   downloaded?: boolean;
+  lyrics?: string;
 }
 
 export interface PlaylistHead {

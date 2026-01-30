@@ -18,7 +18,8 @@ INSERT INTO tracks (
     artist_id,
     artists,
     track_release_date,
-    downloaded
+    downloaded,
+    lyrics
 )
 VALUES (
     $7,
@@ -29,9 +30,19 @@ VALUES (
     $1,
     $11,
     $12,
-    $13
+    $13,
+    $14
 )
-ON CONFLICT (track_id) DO NOTHING;
+ON CONFLICT (track_id) DO UPDATE
+SET
+    track_name = EXCLUDED.track_name,
+    duration = EXCLUDED.duration,
+    popularity = EXCLUDED.popularity,
+    album_id = EXCLUDED.album_id,
+    artist_id = EXCLUDED.artist_id,
+    artists = EXCLUDED.artists,
+    track_release_date = EXCLUDED.track_release_date,
+    lyrics = EXCLUDED.lyrics;
 
 -- name: GetTrackByID :one
 SELECT * FROM tracks WHERE track_id = $1;
@@ -77,7 +88,8 @@ SELECT
                 'artists', t.artists,
                 'cover_url', a.cover_url,
                 'downloaded', t.downloaded,
-                'track_release_date', t.track_release_date
+                'track_release_date', t.track_release_date,
+                'lyrics', t.lyrics
             )
         ) FILTER (WHERE t.track_id IS NOT NULL),
         '[]'::json

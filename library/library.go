@@ -66,6 +66,7 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	fmt.Println("youtube url:", youtubeURL)
 
 	args[0] = "save"
+	args = append(args, "--lyrics", "synced", "--generate-lrc")
 	if err := exec.Command(env.DefaultEnv.PathToSpotDL, args...).Run(); err != nil {
 		return fmt.Errorf("spotdl save command failed: %w", err)
 	}
@@ -86,6 +87,7 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 		CoverURL    string   `json:"cover_url"`
 		Popularity  int32    `json:"popularity"`
 		Duration    int32    `json:"duration"`
+		Lyrics      string   `json:"lyrics"`
 	}
 	var metadataList []trackMetadata
 	metadata, err := os.ReadFile(mdfile)
@@ -101,6 +103,14 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	}
 
 	m := metadataList[0]
+
+	slog.Info("download metadata for track", "id", m.ID, "name", m.Name, "artist", m.Artist, "album", m.AlbumName, "lyrics_length", len(m.Lyrics))
+	if env.DefaultEnv.Debug && m.Lyrics == "" {
+		slog.Warn("no lyrics found for track", "track_id", m.ID)
+	} else if env.DefaultEnv.Debug {
+		fmt.Println("lyrics:", m.Lyrics)
+	}
+
 	track_date := releaseDate(m.Date)
 	err = l.queries.InsertTrack(context.Background(), queries.InsertTrackParams{
 		ArtistID:         m.ArtistID,
@@ -116,8 +126,10 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 		Popularity:       m.Popularity,
 		TrackReleaseDate: track_date,
 		Downloaded:       true,
+		Lyrics:           m.Lyrics,
 	})
 	if err != nil {
+		slog.Error("insert track into db", "error", err, "track_id", m.ID)
 		return fmt.Errorf("insert track: %w", err)
 	}
 
@@ -362,6 +374,8 @@ func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTra
 
 			Duration:   int32(item.DurationMs / 1000), // convert ms to s
 			Popularity: item.Popularity,
+
+			Lyrics: "", // we don't get lyrics from spotify
 		}
 		err := l.queries.InsertTrack(ctx, insertParamsFromSearchRow(t)) // skips dupes (on conflict do nothing)
 		if err != nil {

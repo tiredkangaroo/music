@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS tracks (
     artist_id text REFERENCES artists(artist_id) NOT NULL,
     artists text[] NOT NULL,
     track_release_date date NOT NULL,
-    downloaded boolean NOT NULL DEFAULT FALSE
+    downloaded boolean NOT NULL DEFAULT FALSE,
+    lyrics text NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS playlists (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
