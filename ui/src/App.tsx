@@ -18,6 +18,7 @@ import {
 } from "./CriticalErrorContext";
 import { QueueView } from "./components/QueueView";
 import { TrackView } from "./components/Track";
+import { LyricsView } from "./components/LyricsView";
 
 export default function App() {
   const [playlists, setPlaylists] = useState<PlaylistHead[]>([]);
@@ -601,7 +602,12 @@ function MainContent(props: {
         <div className="flex-1 flex flex-col justify-center items-center">
           <h1 className="text-4xl font-bold">select a playlist</h1>
         </div>
-        <Player isQueueOpen={isQueueOpen} setIsQueueOpen={setIsQueueOpen} />
+        <Player
+          isQueueOpen={isQueueOpen}
+          setIsQueueOpen={setIsQueueOpen}
+          isLyricsOpen={lyricsOpen}
+          setIsLyricsOpen={setIsLyricsOpen}
+        />
       </div>
     );
   }
@@ -612,12 +618,38 @@ function MainContent(props: {
         <QueueView
           isOpen={isQueueOpen}
           setIsOpen={(v) => {
-            setIsLyricsOpen(false);
+            if (v) {
+              setIsLyricsOpen(false);
+            }
             setIsQueueOpen(v);
           }}
         />
+        <LyricsView
+          isOpen={lyricsOpen}
+          setIsOpen={(v) => {
+            if (v) {
+              setIsQueueOpen(false);
+            }
+            setIsLyricsOpen(v);
+          }}
+        />
       </div>
-      <Player isQueueOpen={isQueueOpen} setIsQueueOpen={setIsQueueOpen} />
+      <Player
+        isQueueOpen={isQueueOpen}
+        setIsQueueOpen={(v) => {
+          if (v) {
+            setIsLyricsOpen(false);
+          }
+          setIsQueueOpen(v);
+        }}
+        isLyricsOpen={lyricsOpen}
+        setIsLyricsOpen={(v) => {
+          if (v) {
+            setIsQueueOpen(false);
+          }
+          setIsLyricsOpen(v);
+        }}
+      />
     </div>
   );
 }

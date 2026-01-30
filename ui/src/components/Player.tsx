@@ -5,6 +5,8 @@ import { playTrack, recordPlay, recordSkip } from "../api";
 export function Player(props: {
   isQueueOpen: boolean;
   setIsQueueOpen: (isOpen: boolean) => void;
+  isLyricsOpen: boolean;
+  setIsLyricsOpen: (isOpen: boolean) => void;
 }) {
   const playerState = useContext(PlayerContext);
   const setPlayerState = useContext(SetPlayerContext);
@@ -20,15 +22,25 @@ export function Player(props: {
 
     const onWaiting = () => setIsWaiting(true);
     const onPlaying = () => setIsWaiting(false);
+    const onTimeUpdate = () => {
+      if (!playerState.isPlaying || audioRef.current?.paused) return;
+      setCurrentTime(audioRef.current?.currentTime || 0);
+      setPlayerState({
+        ...playerState,
+        currentTime: audioRef.current?.currentTime || 0,
+      });
+    };
 
     audioRef.current.addEventListener("waiting", onWaiting);
     audioRef.current.addEventListener("playing", onPlaying);
     audioRef.current.addEventListener("canplay", onPlaying);
+    audioRef.current.addEventListener("timeupdate", onTimeUpdate);
 
     return () => {
       audioRef.current?.removeEventListener("waiting", onWaiting);
       audioRef.current?.removeEventListener("playing", onPlaying);
       audioRef.current?.removeEventListener("canplay", onPlaying);
+      audioRef.current?.removeEventListener("timeupdate", onTimeUpdate);
     };
   }, [audioRef.current]);
 
@@ -299,6 +311,7 @@ export function Player(props: {
           onLoadedMetadata={(e) => {
             setDuration(e.currentTarget.duration);
           }}
+          id="player-audio"
         />
       </div>
       <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[45%] flex items-center gap-2">
@@ -327,7 +340,24 @@ export function Player(props: {
           {String(Math.floor(duration % 60)).padStart(2, "0")}
         </span>
       </div>
-      <div>
+      <div className="flex flex-row items-center gap-4">
+        <button onClick={() => props.setIsLyricsOpen(!props.isLyricsOpen)}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="m11 7.601-5.994 8.19a1 1 0 0 0 .1 1.298l.817.818a1 1 0 0 0 1.314.087L15.09 12" />
+            <path d="M16.5 21.174C15.5 20.5 14.372 20 13 20c-2.058 0-3.928 2.356-6 2-2.072-.356-2.775-3.369-1.5-4.5" />
+            <circle cx="16" cy="7" r="5" />
+          </svg>
+        </button>
         <button onClick={() => setIsQueueOpen(!isQueueOpen)}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
