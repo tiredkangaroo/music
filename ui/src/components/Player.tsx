@@ -23,7 +23,17 @@ export function Player(props: {
     const onWaiting = () => setIsWaiting(true);
     const onPlaying = () => setIsWaiting(false);
     const onTimeUpdate = () => {
-      if (!playerState.isPlaying || audioRef.current?.paused) return;
+      if (
+        !playerState.isPlaying ||
+        audioRef.current?.paused ||
+        !audioRef.current
+      )
+        return;
+      console.log(
+        "time update",
+        audioRef.current?.currentTime,
+        playerState.currentTrack?.track_name,
+      );
       setCurrentTime(audioRef.current?.currentTime || 0);
       setPlayerState({
         ...playerState,
@@ -42,7 +52,7 @@ export function Player(props: {
       audioRef.current?.removeEventListener("canplay", onPlaying);
       audioRef.current?.removeEventListener("timeupdate", onTimeUpdate);
     };
-  }, [audioRef.current]);
+  }, [playerState.currentTrack, audioRef.current]);
 
   useEffect(() => {
     if (playerState.isPlaying && currentTime === duration && duration > 0) {

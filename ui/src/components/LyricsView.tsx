@@ -71,12 +71,6 @@ export function LyricsView(props: {
       });
     }
   }, [currentLineIndex]);
-  console.log(
-    playerState.currentTime,
-    currentLineIndex,
-    lyricLines,
-    lyricLines[currentLineIndex],
-  );
 
   if (!props.isOpen) {
     return null;

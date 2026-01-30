@@ -44,7 +44,13 @@ export function TrackView(props: {
           recordSkip(playerState.playID!, playerState.currentTime);
         }
         const playID = await recordPlay(track.track_id);
-        console.log("recording play as a result of clicking track", playID);
+        console.log(
+          "recording play as a result of clicking track",
+          playID,
+          "name",
+          track.track_name,
+        );
+        // (document.getElementById("player-audio") as HTMLAudioElement).src = "";
         setPlayerState({
           currentTrack: track,
           isPlaying: true,

@@ -107,8 +107,6 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	slog.Info("download metadata for track", "id", m.ID, "name", m.Name, "artist", m.Artist, "album", m.AlbumName, "lyrics_length", len(m.Lyrics))
 	if env.DefaultEnv.Debug && m.Lyrics == "" {
 		slog.Warn("no lyrics found for track", "track_id", m.ID)
-	} else if env.DefaultEnv.Debug {
-		fmt.Println("lyrics:", m.Lyrics)
 	}
 
 	track_date := releaseDate(m.Date)
@@ -129,7 +127,6 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 		Lyrics:           m.Lyrics,
 	})
 	if err != nil {
-		slog.Error("insert track into db", "error", err, "track_id", m.ID)
 		return fmt.Errorf("insert track: %w", err)
 	}
 
