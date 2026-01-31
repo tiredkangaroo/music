@@ -152,6 +152,16 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	if env.DefaultEnv.Debug {
 		slog.Debug("downloaded", "track_id", m.ID)
 	}
+	// see if there's any mp4 files and delete them (yt-dlp creates audioless mp4 files?? idk what the option is to stop that)
+	files, err := os.ReadDir(l.storagePath)
+	if err != nil {
+		return fmt.Errorf("read storage directory: %w", err)
+	}
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".mp4") {
+			os.Remove(filepath.Join(l.storagePath, file.Name()))
+		}
+	}
 	return nil
 }
 

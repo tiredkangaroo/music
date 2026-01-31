@@ -1,5 +1,6 @@
 import { useContext, useEffect, useState, useRef } from "react";
 import { PlayerContext, SetPlayerContext } from "../PlayerContext";
+import { getTrackLyrics } from "../api";
 
 interface LyricLine {
   time: number;
@@ -37,10 +38,22 @@ export function LyricsView(props: {
   const currentLineRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!playerState.currentTrack) {
+      setLyricLines([]);
+      return;
+    }
     if (playerState.currentTrack?.lyrics) {
       setLyricLines(parseLyrics(playerState.currentTrack.lyrics));
     } else {
-      setLyricLines([]);
+      // fetch lyrics when not available
+      getTrackLyrics(playerState.currentTrack.track_id).then((res) => {
+        if (res.error) {
+          setLyricLines([]);
+          return;
+        }
+        const parsed = parseLyrics(res);
+        setLyricLines(parsed);
+      });
     }
   }, [playerState.currentTrack]);
 

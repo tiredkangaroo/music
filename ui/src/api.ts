@@ -106,3 +106,12 @@ export async function requestDownload(trackID: string) {
   });
   if (!res.ok) throw new Error("request download failed");
 }
+
+export async function getTrackLyrics(
+  trackID: string,
+): Promise<WithError<string>> {
+  const res = await fetch(`${API_BASE}/lyrics/${trackID}`);
+  if (!res.ok) throw new Error("get lyrics failed");
+  const data = await res.json();
+  return data.lyrics as string;
+}

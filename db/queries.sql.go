@@ -132,6 +132,17 @@ func (q *Queries) GetTrackByID(ctx context.Context, trackID string) (Track, erro
 	return i, err
 }
 
+const getTrackLyrics = `-- name: GetTrackLyrics :one
+SELECT lyrics FROM tracks WHERE track_id = $1
+`
+
+func (q *Queries) GetTrackLyrics(ctx context.Context, trackID string) (string, error) {
+	row := q.db.QueryRow(ctx, getTrackLyrics, trackID)
+	var lyrics string
+	err := row.Scan(&lyrics)
+	return lyrics, err
+}
+
 const insertTrack = `-- name: InsertTrack :exec
 WITH upsert_artist AS (
     INSERT INTO artists (artist_id, artist_name)

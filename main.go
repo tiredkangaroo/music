@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/tiredkangaroo/music/db"
 	"github.com/tiredkangaroo/music/env"
 	"github.com/tiredkangaroo/music/library"
 	"github.com/tiredkangaroo/music/server"
@@ -29,7 +30,7 @@ func main() {
 
 	lib := library.NewLibrary(env.DefaultEnv.DataPath, pool)
 
-	srv := server.NewServer(lib)
+	srv := server.NewServer(lib, db.New(pool))
 	if err := srv.Serve(); err != nil {
 		panic(err)
 	}

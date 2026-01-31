@@ -21,7 +21,8 @@ import (
 )
 
 type Server struct {
-	lib *library.Library
+	lib     *library.Library
+	queries *db.Queries
 }
 
 func (s *Server) Serve() error {
@@ -62,6 +63,18 @@ func (s *Server) Serve() error {
 		// serve the content
 		http.ServeContent(c.Response().Writer, c.Request(), s.lib.PathToTrackFile(trackID), time.Time{}, bytes.NewReader(data))
 		return nil
+	})
+
+	e.GET("/lyrics/:trackID", func(c echo.Context) error {
+		trackID := c.Param("trackID")
+		if trackID == "" {
+			return c.JSON(400, errormap("trackID parameter is required"))
+		}
+		lyrics, err := s.queries.GetTrackLyrics(c.Request().Context(), trackID)
+		if err != nil {
+			return c.JSON(500, errormap(err.Error()))
+		}
+		return c.JSON(200, map[string]string{"lyrics": lyrics})
 	})
 
 	e.POST("/record/play/:trackID", func(c echo.Context) error {
@@ -248,10 +261,11 @@ func (s *Server) Serve() error {
 		slog.Info("starting server without TLS", "address", env.DefaultEnv.ServerAddress)
 		return e.Start(env.DefaultEnv.ServerAddress)
 	}
+
 }
 
-func NewServer(lib *library.Library) *Server {
-	return &Server{lib: lib}
+func NewServer(lib *library.Library, q *db.Queries) *Server {
+	return &Server{lib: lib, queries: q}
 }
 
 func errormap(err string) map[string]string {

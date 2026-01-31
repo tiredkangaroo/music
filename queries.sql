@@ -47,6 +47,9 @@ SET
 -- name: GetTrackByID :one
 SELECT * FROM tracks WHERE track_id = $1;
 
+-- name: GetTrackLyrics :one
+SELECT lyrics FROM tracks WHERE track_id = $1;
+
 -- name: SearchTrackByName :many
 SELECT * FROM tracks
 JOIN albums ON tracks.album_id = albums.album_id
