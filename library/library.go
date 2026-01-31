@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,16 +31,23 @@ type Library struct {
 	pool        *pgxpool.Pool
 	queries     *queries.Queries
 
-	spotifyToken *spotifyToken
+	spotifyToken     *spotifyToken
+	dlNoDuplicate    *noDuplicate
+	youtubeURLRegexp *regexp.Regexp
 }
 
 // Download downloads tracks, albums or playlists specified in things slice. A thing can be a
 // link to a spotify track, album or playlist, or it can be a search query like
 // "Blinding Lights - The Weeknd".
 func (l *Library) Download(ctx context.Context, thing string) error {
-	if env.DefaultEnv.Debug {
-		slog.Debug("downloading", "thing", thing)
+	if !l.dlNoDuplicate.Add(thing) {
+		slog.Debug("download already in progress, skipping", "thing", thing)
+		l.dlNoDuplicate.Wait(thing)
+		return nil
 	}
+	defer l.dlNoDuplicate.Remove(thing)
+
+	slog.Debug("downloading", "thing", thing)
 	// steps: spotdl url and metadata download
 	// read youtube url (split by \n, idx 1) then read metadata and insert into db
 	// then use yt-dlp to download audio files
@@ -58,12 +66,13 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("spotdl command failed: %w\nlogs: %s", err, logs.String())
 	}
-	logsSplit := strings.Split(logs.String(), "\n")
-	if len(logsSplit) < 2 {
-		return fmt.Errorf("spotdl output too short: %s", logs.String())
+	ytURLmatches := l.youtubeURLRegexp.FindAllString(logs.String(), -1)
+	if len(ytURLmatches) == 0 {
+		slog.Error("could not find youtube url in spotdl output", "logs", logs.String())
+		return fmt.Errorf("could not find youtube url in spotdl output")
 	}
-	youtubeURL := logsSplit[1]
-	fmt.Println("youtube url:", youtubeURL)
+	youtubeURL := ytURLmatches[0]
+	slog.Debug("found youtube url", "url", youtubeURL)
 
 	args[0] = "save"
 	args = append(args, "--lyrics", "synced", "--generate-lrc")
@@ -123,7 +132,6 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 		Duration:         m.Duration,
 		Popularity:       m.Popularity,
 		TrackReleaseDate: track_date,
-		Downloaded:       true,
 		Lyrics:           m.Lyrics,
 	})
 	if err != nil {
@@ -147,11 +155,13 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	ydlCmd.Dir = l.storagePath
 
 	if err := ydlCmd.Run(); err != nil {
-		return fmt.Errorf("yt-dlp command failed: %w\nlogs: %s", err, ydlLogs.String())
+		if strings.Contains(ydlLogs.String(), "This video is age-restricted") {
+			slog.Error("yt-dlp command failed: age-restricted video", "logs", ydlLogs.String())
+			return fmt.Errorf("track is age-restricted")
+		}
+		return fmt.Errorf("yt-dlp command failed: %w", err)
 	}
-	if env.DefaultEnv.Debug {
-		slog.Debug("downloaded", "track_id", m.ID)
-	}
+	slog.Debug("downloaded", "track_id", m.ID)
 	// see if there's any mp4 files and delete them (yt-dlp creates audioless mp4 files?? idk what the option is to stop that)
 	files, err := os.ReadDir(l.storagePath)
 	if err != nil {
@@ -162,6 +172,7 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 			os.Remove(filepath.Join(l.storagePath, file.Name()))
 		}
 	}
+	l.queries.MarkTrackAsDownloaded(context.Background(), m.ID)
 	return nil
 }
 
@@ -177,8 +188,8 @@ func (l *Library) DownloadIfNotExists(trackIDs ...string) error {
 		p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
 		if _, err := os.Stat(p); os.IsNotExist(err) {
 			if err := l.Download(context.Background(), "https://open.spotify.com/track/"+trackID); err != nil {
-				slog.Error("download track", "error", err, "track_id", trackID)
-				return fmt.Errorf("download track %s (successfully downloaded %d/%d): %w", trackID, i, len(trackIDs), err)
+				slog.Error("download track", "error", err, "track_id", trackID, "index", i, "total", len(trackIDs))
+				return err
 			}
 		}
 	}
@@ -270,7 +281,7 @@ func (l *Library) Play(ctx context.Context, trackID string) (io.ReadCloser, erro
 	// file not found, re-download
 	if err := l.Download(ctx, "https://open.spotify.com/track/"+trackID); err != nil {
 		slog.Error("download track", "error", err, "track_id", trackID)
-		return nil, fmt.Errorf("download track: %w", err)
+		return nil, err
 	}
 	return os.Open(p)
 }
@@ -568,5 +579,12 @@ func releaseDate(d string) pgtype.Date {
 
 func NewLibrary(storagePath string, pool *pgxpool.Pool) *Library {
 	q := queries.New(pool)
-	return &Library{storagePath: storagePath, pool: pool, queries: q, spotifyToken: new(spotifyToken)}
+	return &Library{
+		storagePath:      storagePath,
+		pool:             pool,
+		queries:          q,
+		spotifyToken:     new(spotifyToken),
+		dlNoDuplicate:    newNoDuplicate(),
+		youtubeURLRegexp: regexp.MustCompile(`https://(?:music\.)?youtube\.com/[^\s]+`),
+	}
 }

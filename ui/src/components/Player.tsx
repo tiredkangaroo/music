@@ -1,6 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { PlayerContext, SetPlayerContext } from "../PlayerContext";
 import { playTrack, recordPlay, recordSkip } from "../api";
+import { SetAlertMessageContext } from "../AlertMessageContext";
 
 export function Player(props: {
   isQueueOpen: boolean;
@@ -16,6 +17,7 @@ export function Player(props: {
   const [duration, setDuration] = useState(0);
   const [isWaiting, setIsWaiting] = useState(true);
   const { isQueueOpen, setIsQueueOpen } = props;
+  const setAlertMessage = useContext(SetAlertMessageContext);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -320,6 +322,24 @@ export function Player(props: {
           }}
           onLoadedMetadata={(e) => {
             setDuration(e.currentTarget.duration);
+          }}
+          onError={async (e) => {
+            const resp = await fetch(
+              playTrack(playerState.currentTrack!.track_id),
+            );
+            if (resp.status === 400) {
+              setAlertMessage(
+                "there's an issue with the way the frontend is requesting the track.",
+              );
+            } else if (resp.status === 401) {
+              // we don't do users yet but we may do taht soon
+              setAlertMessage("please log in to play this track");
+            } else if (resp.status === 500) {
+              const data = await resp.json();
+              setAlertMessage(
+                `playback error: ${data.error} (playing: ${playerState.currentTrack?.track_name})`,
+              );
+            }
           }}
           id="player-audio"
         />

@@ -4,6 +4,7 @@
 - playlist image chooser to pick square out of the image
 - api for what the user is listening to?? maybe.
 - compact mode?
+- get around youtube age restriction without using cookies? (ex. can't download from surfer rosa bc album cover)
 
 - immediate: enforce min w and height for the app
 - begin searching from psql and not spotify search api or both?

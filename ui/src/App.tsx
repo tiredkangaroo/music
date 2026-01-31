@@ -19,10 +19,15 @@ import {
 import { QueueView } from "./components/QueueView";
 import { TrackView } from "./components/Track";
 import { LyricsView } from "./components/LyricsView";
+import {
+  AlertMessageContext,
+  SetAlertMessageContext,
+} from "./AlertMessageContext";
 
 export default function App() {
   const [playlists, setPlaylists] = useState<PlaylistHead[]>([]);
-  const [criticalError, setCriticalError] = useState<string | null>(null);
+  const [criticalError, setCriticalError] = useState<string | null>(null); // full-screen critical error
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(
     null,
   );
@@ -72,48 +77,78 @@ export default function App() {
   return (
     <CriticalErrorContext.Provider value={criticalError}>
       <SetCriticalErrorContext.Provider value={setCriticalError}>
-        <PlayerContext.Provider value={playerState}>
-          <SetPlayerContext.Provider value={setPlayerState}>
-            <div className="min-h-screen font-mono bg-[#edf5ff] flex flex-col md:flex-row w-full h-full">
-              <Sidebar
-                playlists={playlists}
-                setPlaylists={setPlaylists}
-                selectedPlaylist={selectedPlaylist}
-                selectPlaylist={selectPlaylist}
-              />
-              <MainContent
-                playlist={selectedPlaylist}
-                setPlaylist={(p) => {
-                  if (p === null) {
-                    setSelectedPlaylist(null); // clear selected playlist
-                    const updatedPlaylists = [...playlists].filter(
-                      // remove deleted playlist
-                      (pl) => pl.id !== selectedPlaylist?.id,
-                    );
-                    setPlaylists(updatedPlaylists);
-                    return;
-                  }
-                  // update playlist details
-                  setSelectedPlaylist(p);
-                  const updatedPlaylists = [...playlists];
-                  const index = updatedPlaylists.findIndex(
-                    (pl) => pl.id === p.id,
-                  );
-                  if (index !== -1) {
-                    updatedPlaylists[index] = {
-                      id: p.id,
-                      name: p.name,
-                      description: p.description,
-                      image_url: p.image_url,
-                      created_at: p.created_at,
-                    };
-                    setPlaylists(updatedPlaylists);
-                  }
-                }}
-              />
-            </div>
-          </SetPlayerContext.Provider>
-        </PlayerContext.Provider>
+        <AlertMessageContext.Provider value={alertMessage}>
+          <SetAlertMessageContext.Provider value={setAlertMessage}>
+            <PlayerContext.Provider value={playerState}>
+              <SetPlayerContext.Provider value={setPlayerState}>
+                {alertMessage && (
+                  <div className="fixed w-[80%] text-center top-4 left-1/2 -translate-x-1/2 bg-red-200 border-2 border-red-600 text-red-900 px-4 py-4 text-lg shadow-2xl z-50 flex flex-row justify-between items-center">
+                    <p>{alertMessage}</p>
+
+                    <button
+                      onClick={() => {
+                        setAlertMessage(null);
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                <div className="min-h-screen font-mono bg-[#edf5ff] flex flex-col md:flex-row w-full h-full">
+                  <Sidebar
+                    playlists={playlists}
+                    setPlaylists={setPlaylists}
+                    selectedPlaylist={selectedPlaylist}
+                    selectPlaylist={selectPlaylist}
+                  />
+                  <MainContent
+                    playlist={selectedPlaylist}
+                    setPlaylist={(p) => {
+                      if (p === null) {
+                        setSelectedPlaylist(null); // clear selected playlist
+                        const updatedPlaylists = [...playlists].filter(
+                          // remove deleted playlist
+                          (pl) => pl.id !== selectedPlaylist?.id,
+                        );
+                        setPlaylists(updatedPlaylists);
+                        return;
+                      }
+                      // update playlist details
+                      setSelectedPlaylist(p);
+                      const updatedPlaylists = [...playlists];
+                      const index = updatedPlaylists.findIndex(
+                        (pl) => pl.id === p.id,
+                      );
+                      if (index !== -1) {
+                        updatedPlaylists[index] = {
+                          id: p.id,
+                          name: p.name,
+                          description: p.description,
+                          image_url: p.image_url,
+                          created_at: p.created_at,
+                        };
+                        setPlaylists(updatedPlaylists);
+                      }
+                    }}
+                  />
+                </div>
+              </SetPlayerContext.Provider>
+            </PlayerContext.Provider>
+          </SetAlertMessageContext.Provider>
+        </AlertMessageContext.Provider>
       </SetCriticalErrorContext.Provider>
     </CriticalErrorContext.Provider>
   );

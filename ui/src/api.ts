@@ -9,7 +9,7 @@ export async function searchTracks(q: string): Promise<Track[]> {
   return res.json();
 }
 
-export function playTrack(trackID: string) {
+export function playTrack(trackID: string): string {
   return `${API_BASE}/play/${trackID}`;
 }
 
@@ -100,11 +100,13 @@ export async function recordSkip(playID: string, skippedAt: number) {
   if (!res.ok) throw new Error("record skip failed");
 }
 
-export async function requestDownload(trackID: string) {
+export async function requestDownload(
+  trackID: string,
+): Promise<WithError<void>> {
   const res = await fetch(`${API_BASE}/download/${trackID}`, {
     method: "POST",
   });
-  if (!res.ok) throw new Error("request download failed");
+  return res.json();
 }
 
 export async function getTrackLyrics(
