@@ -55,7 +55,7 @@ export function LyricsView(props: {
         setLyricLines(parsed);
       });
     }
-  }, [playerState.currentTrack]);
+  }, [playerState.currentTrack, props.isOpen]);
 
   useEffect(() => {
     if (lyricLines.length === 0) return;

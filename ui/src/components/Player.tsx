@@ -332,7 +332,7 @@ export function Player(props: {
                 "there's an issue with the way the frontend is requesting the track.",
               );
             } else if (resp.status === 401) {
-              // we don't do users yet but we may do taht soon
+              // we don't do users yet but we may do that soon
               setAlertMessage("please log in to play this track");
             } else if (resp.status === 500) {
               const data = await resp.json();

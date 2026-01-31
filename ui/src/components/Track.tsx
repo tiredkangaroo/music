@@ -65,7 +65,7 @@ export function TrackView(props: {
         });
       }}
     >
-      <div className="flex flex-row justify-between items-center">
+      <div className="flex flex-row justify-between items-center gap-6">
         <div className="flex flex-row gap-4">
           <img src={track.cover_url} className="w-12 object-contain" />
           <div>

@@ -37,11 +37,11 @@ export function QueueView(props: {
           </svg>
         </button>
       </div>
-      <div className="overflow-y-auto max-h-[60vh]">
+      <div className="overflow-y-auto max-h-[78vh]">
         {playerState.currentTrack && (
           <div className="flex flex-col gap-4 mb-4">
             <h2 className="text-xl font-bold">Currently Playing: </h2>
-            <TrackView track={playerState.currentTrack!} />
+            <TrackView track={playerState.currentTrack!} compact />
           </div>
         )}
         <h2 className="text-xl font-bold mb-4">Up Next</h2>
@@ -100,6 +100,7 @@ export function QueueView(props: {
               >
                 <TrackView
                   track={track}
+                  compact
                   className="w-full cursor-move"
                   customOnClick={async () => {
                     const playID = await recordPlay(track.track_id);

@@ -629,19 +629,51 @@ function MainContent(props: {
 }) {
   const { playlist } = props;
   const [isQueueOpen, setIsQueueOpen] = useState<boolean>(false);
-  const [lyricsOpen, setIsLyricsOpen] = useState<boolean>(false);
+  const [isLyricsOpen, setIsLyricsOpen] = useState<boolean>(false);
 
   if (!playlist) {
     return (
       <div className="flex flex-col w-full h-screen">
-        <div className="flex-1 flex flex-col justify-center items-center">
-          <h1 className="text-4xl font-bold">select a playlist</h1>
+        <div className="flex-1 min-h-0 flex flex-row">
+          <div className="w-full h-full flex flex-col justify-center items-center">
+            <h1 className="text-4xl font-bold text-gray-600">
+              select a playlist
+            </h1>
+          </div>
+          <QueueView
+            isOpen={isQueueOpen}
+            setIsOpen={(v) => {
+              if (v) {
+                setIsLyricsOpen(false);
+              }
+              setIsQueueOpen(v);
+            }}
+          />
+          <LyricsView
+            isOpen={isLyricsOpen}
+            setIsOpen={(v) => {
+              if (v) {
+                setIsQueueOpen(false);
+              }
+              setIsLyricsOpen(v);
+            }}
+          />
         </div>
         <Player
           isQueueOpen={isQueueOpen}
-          setIsQueueOpen={setIsQueueOpen}
-          isLyricsOpen={lyricsOpen}
-          setIsLyricsOpen={setIsLyricsOpen}
+          setIsQueueOpen={(v) => {
+            if (v) {
+              setIsLyricsOpen(false);
+            }
+            setIsQueueOpen(v);
+          }}
+          isLyricsOpen={isLyricsOpen}
+          setIsLyricsOpen={(v) => {
+            if (v) {
+              setIsQueueOpen(false);
+            }
+            setIsLyricsOpen(v);
+          }}
         />
       </div>
     );
@@ -660,7 +692,7 @@ function MainContent(props: {
           }}
         />
         <LyricsView
-          isOpen={lyricsOpen}
+          isOpen={isLyricsOpen}
           setIsOpen={(v) => {
             if (v) {
               setIsQueueOpen(false);
@@ -677,7 +709,7 @@ function MainContent(props: {
           }
           setIsQueueOpen(v);
         }}
-        isLyricsOpen={lyricsOpen}
+        isLyricsOpen={isLyricsOpen}
         setIsLyricsOpen={(v) => {
           if (v) {
             setIsQueueOpen(false);
