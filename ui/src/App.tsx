@@ -82,7 +82,7 @@ export default function App() {
             <PlayerContext.Provider value={playerState}>
               <SetPlayerContext.Provider value={setPlayerState}>
                 {alertMessage && (
-                  <div className="fixed w-[80%] text-center top-4 left-1/2 -translate-x-1/2 bg-red-200 border-2 border-red-600 text-red-900 px-4 py-4 text-lg shadow-2xl z-50 flex flex-row justify-between items-center">
+                  <div className="fixed w-[80%] text-center top-4 left-1/2 -translate-x-1/2 bg-red-200 border-2 border-red-600 text-red-900 px-4 py-3 text-md shadow-2xl z-50 flex flex-row justify-between items-center">
                     <p>{alertMessage}</p>
 
                     <button
