@@ -54,6 +54,24 @@ export default function App() {
       setPlaylists(data);
     });
   }, []);
+
+  useEffect(() => {
+    window.addEventListener("resize", () => {
+      console.log(window.innerWidth, window.innerHeight);
+      if (window.innerWidth < 850) {
+        setCriticalError("window too small (850x650 minimum)");
+        return;
+      }
+      if (window.innerHeight < 650) {
+        setCriticalError("window too small (850x650 minimum)");
+        return;
+      }
+      if (criticalError === "window too small (850x650 minimum)") {
+        setCriticalError(null); // clear error if size is now ok
+      }
+    });
+  }, []);
+
   function selectPlaylist(id: string) {
     getPlaylist(id).then((data) => setSelectedPlaylist(data));
   }

@@ -42,7 +42,10 @@ SET
     artist_id = EXCLUDED.artist_id,
     artists = EXCLUDED.artists,
     track_release_date = EXCLUDED.track_release_date,
-    lyrics = EXCLUDED.lyrics;
+    lyrics = CASE
+    WHEN EXCLUDED.lyrics = '' THEN tracks.lyrics
+    ELSE EXCLUDED.lyrics
+END;
 
 -- name: GetTrackByID :one
 SELECT * FROM tracks WHERE track_id = $1;

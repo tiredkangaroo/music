@@ -2,27 +2,26 @@ package server
 
 import (
 	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
-	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"net/url"
-	"strconv"
+	"path/filepath"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/tiredkangaroo/music/db"
 	"github.com/tiredkangaroo/music/env"
 	"github.com/tiredkangaroo/music/library"
+	"github.com/tiredkangaroo/music/storage"
 )
 
 type Server struct {
 	lib     *library.Library
 	queries *db.Queries
+	storage storage.Storage
 }
 
 func (s *Server) Serve() error {
@@ -33,7 +32,9 @@ func (s *Server) Serve() error {
 		e.Use(middleware.CORS())
 	}
 
-	e.GET("/search", func(c echo.Context) error {
+	api := e.Group("/api/v1")
+
+	api.GET("/search", func(c echo.Context) error {
 		query := c.QueryParam("q")
 		if query == "" {
 			return c.JSON(400, errormap("query parameter 'q' is required"))
@@ -45,7 +46,7 @@ func (s *Server) Serve() error {
 		return c.JSON(200, res)
 	})
 
-	e.GET("/play/:trackID", func(c echo.Context) error {
+	api.GET("/play/:trackID", func(c echo.Context) error {
 		trackID := c.Param("trackID")
 		if trackID == "" {
 			return c.JSON(400, errormap("trackID parameter is required"))
@@ -65,7 +66,7 @@ func (s *Server) Serve() error {
 		return nil
 	})
 
-	e.GET("/lyrics/:trackID", func(c echo.Context) error {
+	api.GET("/lyrics/:trackID", func(c echo.Context) error {
 		trackID := c.Param("trackID")
 		if trackID == "" {
 			return c.JSON(400, errormap("trackID parameter is required"))
@@ -77,7 +78,7 @@ func (s *Server) Serve() error {
 		return c.JSON(200, map[string]string{"lyrics": lyrics})
 	})
 
-	e.POST("/record/play/:trackID", func(c echo.Context) error {
+	api.POST("/record/play/:trackID", func(c echo.Context) error {
 		return c.JSON(200, map[string]string{
 			"play_id": "not-implemented",
 		})
@@ -91,7 +92,7 @@ func (s *Server) Serve() error {
 		// }
 		// return c.JSON(200, map[string]string{"play_id": id})
 	})
-	e.POST("/record/skip/:playID", func(c echo.Context) error {
+	api.POST("/record/skip/:playID", func(c echo.Context) error {
 		// playID := c.Param("playID")
 		// if playID == "" {
 		// 	return c.JSON(400, errormap("playID parameter is required"))
@@ -107,7 +108,7 @@ func (s *Server) Serve() error {
 		return c.JSON(200, nil)
 	})
 
-	e.GET("/playlists", func(c echo.Context) error {
+	api.GET("/playlists", func(c echo.Context) error {
 		playlists, err := s.lib.ListPlaylists(c.Request().Context())
 		if err != nil {
 			return c.JSON(500, errormap(err.Error()))
@@ -119,7 +120,7 @@ func (s *Server) Serve() error {
 	})
 
 	// create playlist
-	e.POST("/playlists", bindreq(func(c echo.Context, req struct {
+	api.POST("/playlists", bindreq(func(c echo.Context, req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 		ImageURL    string `json:"image_url"`
@@ -131,7 +132,7 @@ func (s *Server) Serve() error {
 		return c.JSON(200, map[string]string{"playlist_id": playlistID})
 	}))
 
-	e.POST("/playlists/import", bindreq(func(c echo.Context, req struct {
+	api.POST("/playlists/import", bindreq(func(c echo.Context, req struct {
 		SpotifyPlaylistURL string `json:"spotify_playlist_url"`
 	}) error {
 		u, err := url.Parse(req.SpotifyPlaylistURL)
@@ -154,7 +155,7 @@ func (s *Server) Serve() error {
 	}))
 
 	// delete playlist
-	e.DELETE("/playlists/:playlistID", func(c echo.Context) error {
+	api.DELETE("/playlists/:playlistID", func(c echo.Context) error {
 		playlistID := c.Param("playlistID")
 		err := s.lib.DeletePlaylist(c.Request().Context(), playlistID)
 		if err != nil {
@@ -164,7 +165,7 @@ func (s *Server) Serve() error {
 	})
 
 	// get playlist details
-	e.GET("/playlists/:playlistID", func(c echo.Context) error {
+	api.GET("/playlists/:playlistID", func(c echo.Context) error {
 		playlistID := c.Param("playlistID")
 		data, err := s.lib.GetPlaylist(c.Request().Context(), playlistID)
 		if err != nil {
@@ -174,7 +175,7 @@ func (s *Server) Serve() error {
 	})
 
 	// add track to playlist
-	e.POST("/playlists/:playlistID/tracks", bindreq(func(c echo.Context, req struct {
+	api.POST("/playlists/:playlistID/tracks", bindreq(func(c echo.Context, req struct {
 		TrackID string `json:"track_id"`
 	}) error {
 		playlistID := c.Param("playlistID")
@@ -186,7 +187,7 @@ func (s *Server) Serve() error {
 	}))
 
 	// remove track from playlist
-	e.DELETE("/playlists/:playlistID/tracks/:trackID", func(c echo.Context) error {
+	api.DELETE("/playlists/:playlistID/tracks/:trackID", func(c echo.Context) error {
 		playlistID := c.Param("playlistID")
 		trackID := c.Param("trackID")
 		err := s.lib.RemoveTrackFromPlaylist(c.Request().Context(), playlistID, trackID)
@@ -197,7 +198,7 @@ func (s *Server) Serve() error {
 	})
 
 	// request download of a track
-	e.POST("/download/:trackID", func(c echo.Context) error {
+	api.POST("/download/:trackID", func(c echo.Context) error {
 		trackID := c.Param("trackID")
 		if trackID == "" {
 			return c.JSON(400, errormap("trackID parameter is required"))
@@ -210,7 +211,7 @@ func (s *Server) Serve() error {
 	})
 
 	// store an image into storage
-	e.POST("/images", func(c echo.Context) error {
+	api.POST("/images", func(c echo.Context) error {
 		file, err := c.FormFile("image")
 		if err != nil {
 			return c.JSON(400, errormap("image file is required"))
@@ -229,31 +230,36 @@ func (s *Server) Serve() error {
 		}
 		defer src.Close()
 
-		// call the storage api
-		req, err := http.NewRequestWithContext(c.Request().Context(), "POST", env.DefaultEnv.StorageURL+"/push", src)
+		u, err := s.storage.Store(c.Request().Context(), src, file.Header.Get("Content-Type"))
 		if err != nil {
-			return c.JSON(500, errormap("internal server error"))
+			return c.JSON(500, errormap(err.Error()))
 		}
-		req.Header.Set("Content-Type", file.Header.Get("Content-Type"))
-		signRequest(req)
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return c.JSON(500, errormap("internal server error"))
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusCreated {
-			slog.Error("store image", "status", resp.StatusCode)
-			return c.JSON(500, errormap("internal server error"))
-		}
-		data, err := io.ReadAll(resp.Body) // the body is the image key
-		if err != nil {
-			return c.JSON(500, errormap("internal server error"))
-		}
-		return c.JSON(200, map[string]string{"image_url": env.DefaultEnv.StorageURL + "/pull/" + string(data)})
-
+		return c.JSON(200, map[string]string{
+			"image_url": u,
+		})
 	})
+
+	api.GET("/data/:id", func(c echo.Context) error {
+		key := c.Param("id")
+
+		localStorage := s.storage.(*storage.LocalStorage)
+		rd, err := localStorage.Load(key)
+		if err != nil {
+			slog.Error("load data", "key", key, "error", err)
+			return c.JSON(404, errormap("file not found"))
+		}
+		defer rd.Close()
+
+		// serve the content
+		c.Response().Writer.WriteHeader(http.StatusOK)
+		c.Response().Header().Set("Content-Type", mime.TypeByExtension(filepath.Ext(key)))
+		if _, err := io.Copy(c.Response().Writer, rd); err != nil {
+			slog.Error("serve data", "key", key, "error", err)
+			return c.JSON(500, errormap("internal server error"))
+		}
+		return nil
+	})
+
 	if env.DefaultEnv.CertPath != "" && env.DefaultEnv.KeyPath != "" {
 		slog.Info("starting server with TLS", "address", env.DefaultEnv.ServerAddress)
 		return e.StartTLS(env.DefaultEnv.ServerAddress, env.DefaultEnv.CertPath, env.DefaultEnv.KeyPath)
@@ -264,8 +270,8 @@ func (s *Server) Serve() error {
 
 }
 
-func NewServer(lib *library.Library, q *db.Queries) *Server {
-	return &Server{lib: lib, queries: q}
+func NewServer(lib *library.Library, q *db.Queries, storage storage.Storage) *Server {
+	return &Server{lib: lib, queries: q, storage: storage}
 }
 
 func errormap(err string) map[string]string {
@@ -279,18 +285,4 @@ func bindreq[T any](handler func(c echo.Context, req T) error) echo.HandlerFunc 
 		}
 		return handler(c, req)
 	}
-}
-func signRequest(req *http.Request) {
-	uploadID := uuid.New().String()
-	timestamp := strconv.FormatInt(time.Now().UTC().Unix(), 10)
-
-	cs := uploadID + "\n" + timestamp
-	csh := hmac.New(sha256.New, []byte(env.DefaultEnv.StorageAPISecret))
-	csh.Write([]byte(cs))
-	csb := csh.Sum(nil)
-	csb_hex := fmt.Sprintf("%x", csb)
-
-	req.Header.Set("X-Upload-ID", uploadID)
-	req.Header.Set("X-Timestamp", timestamp)
-	req.Header.Set("X-Signature", csb_hex)
 }

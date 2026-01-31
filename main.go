@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"log/slog"
+	"path/filepath"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/tiredkangaroo/music/db"
 	"github.com/tiredkangaroo/music/env"
 	"github.com/tiredkangaroo/music/library"
 	"github.com/tiredkangaroo/music/server"
+	"github.com/tiredkangaroo/music/storage"
 )
 
 func main() {
@@ -30,7 +32,17 @@ func main() {
 
 	lib := library.NewLibrary(env.DefaultEnv.DataPath, pool)
 
-	srv := server.NewServer(lib, db.New(pool))
+	var s storage.Storage
+	if env.DefaultEnv.StorageURL != "" && env.DefaultEnv.StorageAPISecret != "" {
+		s = &storage.RemoteStorage{
+			StorageURL:       env.DefaultEnv.StorageURL,
+			StorageAPISecret: env.DefaultEnv.StorageAPISecret,
+		}
+	} else {
+		s = &storage.LocalStorage{DataPath: filepath.Join(env.DefaultEnv.DataPath, "storage")}
+	}
+
+	srv := server.NewServer(lib, db.New(pool), s)
 	if err := srv.Serve(); err != nil {
 		panic(err)
 	}
