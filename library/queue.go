@@ -5,7 +5,7 @@ import (
 )
 
 type noDuplicate struct {
-	keys map[string]chan struct{} // keys of functions in the queue
+	keys map[string]chan struct{} // keys of functions in the queue, we could theoretically have remove functions pass in values so waiters can get return values
 	rwmx sync.RWMutex             // rw mutex to protect keys
 }
 
@@ -44,5 +44,26 @@ func (nd *noDuplicate) Wait(key string) {
 func newNoDuplicate() *noDuplicate {
 	return &noDuplicate{
 		keys: make(map[string]chan struct{}),
+	}
+}
+
+// slots limits the number of concurrent operations. it has a fixed number of slots,
+// and each operation must acquire a slot before it can proceed. when an operation
+// is done, it releases its slot back to the pool.
+type slots struct {
+	sem chan struct{}
+}
+
+func (s *slots) Acquire() {
+	s.sem <- struct{}{}
+}
+
+func (s *slots) Release() {
+	<-s.sem
+}
+
+func newSlots(max int) *slots {
+	return &slots{
+		sem: make(chan struct{}, max),
 	}
 }

@@ -33,8 +33,13 @@ type Library struct {
 	pool        *pgxpool.Pool
 	queries     *queries.Queries
 
-	spotifyToken     *spotifyToken
-	dlNoDuplicate    *noDuplicate
+	spotifyToken *spotifyToken
+
+	dlNoDuplicate *noDuplicate
+	// we're using maximum ongoing downloads now because i think the # of 403 from yt increases and is related to too many concurrent download (only really happens when importing and not single track downloads)
+	ongoingDownloads        *slots
+	maximumOngoingDownloads int
+
 	youtubeURLRegexp *regexp.Regexp
 }
 
@@ -48,7 +53,7 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 		return err
 	}
 	err = l.download(trackID, youtubeURL)
-	return nil
+	return err
 }
 
 // CreateSkeletonTrack creates a skeleton track entry with the track ID (to avoid fkey errors
@@ -64,6 +69,11 @@ func (l *Library) createSkeletonTrack(ctx context.Context, trackID string) error
 }
 
 func (l *Library) download(trackID, youtubeURL string) error {
+	// acquire a slot to perform downloading
+	l.ongoingDownloads.Acquire()
+	defer l.ongoingDownloads.Release()
+
+	// check for duplicate downloads
 	if !l.dlNoDuplicate.Add(youtubeURL) {
 		slog.Info("download already in progress, skipping", "youtube_url", youtubeURL)
 		l.dlNoDuplicate.Wait(youtubeURL)
@@ -90,10 +100,9 @@ func (l *Library) download(trackID, youtubeURL string) error {
 
 	if err := ydlCmd.Run(); err != nil {
 		if strings.Contains(ydlLogs.String(), "This video is age-restricted") {
-			// slog.Error("yt-dlp command failed: age-restricted video", "logs", ydlLogs.String())
 			return fmt.Errorf("track is age-restricted")
 		}
-		// slog.Error("yt-dlp command failed", "error", err, "logs", ydlLogs.String())
+		slog.Error("yt-dlp command failed", "error", err, "logs", ydlLogs.String())
 		return fmt.Errorf("yt-dlp command failed: %w", err)
 	}
 	slog.Info("downloaded", "track_id", trackID)
@@ -117,6 +126,9 @@ func (l *Library) downloadIfNotExists(trackID, youtubeURL string) error {
 	p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
 	if _, err := os.Stat(p); os.IsNotExist(err) {
 		return l.download(trackID, youtubeURL)
+	} else {
+		slog.Info("track already exists, skipping download", "track_id", trackID)
+		l.queries.MarkTrackAsDownloaded(context.Background(), trackID)
 	}
 	return nil
 }
@@ -193,7 +205,7 @@ func (l *Library) preDownload(thing string) (string, string, error) {
 
 	m := metadataList[0]
 
-	slog.Info("download metadata for track", "id", m.ID, "name", m.Name, "artist", m.Artist, "album", m.AlbumName, "lyrics_length", len(m.Lyrics))
+	slog.Info("downloaded metadata for track", "id", m.ID, "name", m.Name, "artist", m.Artist, "album", m.AlbumName, "lyrics_length", len(m.Lyrics))
 	if env.DefaultEnv.Debug && m.Lyrics == "" {
 		slog.Warn("no lyrics found for track", "track_id", m.ID)
 	}
@@ -596,11 +608,11 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (queries
 			if err != nil {
 				slog.Warn("pre-download track for imported playlist", "error", err, "track_id", track.TrackID)
 			}
-			go l.downloadIfNotExists(track.TrackID, youtubeURL) // best effort dl in seperate goroutine
-			err = l.AddTrackToPlaylist(ctx, playlistID, track.TrackID)
-			if err != nil {
-				slog.Warn("add track to imported playlist", "error", err, "track_id", track.TrackID, "playlist_id", playlistID)
-			}
+			go l.downloadIfNotExists(track.TrackID, youtubeURL)
+			err = l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
+				PlaylistID: optuuid(uuid.MustParse(playlistID)),
+				TrackID:    track.TrackID,
+			})
 		}(ctrack)
 	}
 	wg.Wait()
@@ -641,11 +653,13 @@ func NewLibrary(storagePath string, pool *pgxpool.Pool) *Library {
 	q := queries.New(pool)
 	os.MkdirAll(storagePath, 0755) // especially needed if not using local storage
 	return &Library{
-		storagePath:      storagePath,
-		pool:             pool,
-		queries:          q,
-		spotifyToken:     new(spotifyToken),
-		dlNoDuplicate:    newNoDuplicate(),
-		youtubeURLRegexp: regexp.MustCompile(`https://(?:music\.)?youtube\.com/[^\s]+`),
+		storagePath:             storagePath,
+		pool:                    pool,
+		queries:                 q,
+		spotifyToken:            new(spotifyToken),
+		dlNoDuplicate:           newNoDuplicate(),
+		youtubeURLRegexp:        regexp.MustCompile(`https://(?:music\.)?youtube\.com/[^\s]+`),
+		ongoingDownloads:        newSlots(env.DefaultEnv.MaximumOngoingDownloads),
+		maximumOngoingDownloads: env.DefaultEnv.MaximumOngoingDownloads,
 	}
 }

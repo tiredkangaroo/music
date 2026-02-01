@@ -3,22 +3,24 @@ package env
 import (
 	"errors"
 	"os"
+	"strconv"
 )
 
 type Environment struct {
-	Debug               bool
-	PathToSpotDL        string
-	PathToYtDL          string
-	SpotifyClientID     string
-	SpotifyClientSecret string
-	ServerAddress       string
-	StorageURL          string
-	StorageAPISecret    string
-	CertPath            string
-	KeyPath             string
-	PostgresURL         string
-	DataPath            string
-	ServerURL           string
+	Debug                   bool
+	PathToSpotDL            string
+	PathToYtDL              string
+	SpotifyClientID         string
+	SpotifyClientSecret     string
+	ServerAddress           string
+	StorageURL              string
+	StorageAPISecret        string
+	CertPath                string
+	KeyPath                 string
+	PostgresURL             string
+	DataPath                string
+	ServerURL               string
+	MaximumOngoingDownloads int
 }
 
 var DefaultEnv = Environment{
@@ -37,6 +39,8 @@ var DefaultEnv = Environment{
 	KeyPath:     os.Getenv("KEY_PATH"),
 	PostgresURL: dv(os.Getenv("POSTGRES_URL"), "postgres://musicer:@localhost:5432/music"),
 	DataPath:    dv(os.Getenv("DATA_PATH"), "/var/lib/musicer/data"),
+
+	MaximumOngoingDownloads: dvi(os.Getenv("MAX_CONCURRENT_DOWNLOADS"), 10),
 }
 
 // Init initializes the environment by checking required variables. It returns an error if any required variable is missing.
@@ -52,4 +56,15 @@ func dv(value, def string) string {
 		return def
 	}
 	return value
+}
+
+func dvi(value string, def int) int {
+	if value == "" {
+		return def
+	}
+	i, err := strconv.Atoi(value)
+	if err != nil {
+		return def
+	}
+	return i
 }
