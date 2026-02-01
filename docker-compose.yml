@@ -21,6 +21,8 @@ services:
       - SERVER_URL=${SERVER_URL}
       - CERT_PATH=${CERT_PATH}
       - KEY_PATH=${KEY_PATH}
+      - STORAGE_URL=${STORAGE_URL}
+      - STORAGE_API_SECRET=${STORAGE_API_SECRET}
       - POSTGRES_URL=postgres://user:password@music-postgres:5432/music
       - DATA_PATH=/var/lib/music/data
     restart: unless-stopped
