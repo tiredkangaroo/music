@@ -210,14 +210,14 @@ export function Player(props: {
   if (!playerState.currentTrack) return <></>;
   return (
     <div
-      className="relative h-[12%] min-h-fit border-t-8 border-black bg-white flex flex-row items-center px-4 py-2 gap-4 justify-between"
+      className="relative h-[12%] border-t-8 border-black bg-white flex flex-row items-center px-4 py-2 gap-4 justify-between"
       inert={isWaiting}
     >
       <div className="flex flex-row items-center gap-4 w-full h-full">
-        <div className="h-full">
+        <div className="relative w-18 h-18 overflow-hidden">
           <img
             src={playerState.currentTrack.cover_url}
-            className="h-full w-full object-cover"
+            className="object-cover aspect-square"
           />
           {isWaiting && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/80 pointer-events-auto">
