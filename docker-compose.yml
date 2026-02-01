@@ -18,7 +18,7 @@ services:
       - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
       - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
       - SERVER_ADDRESS=:${PORT}
-      - BACKEND_URL=${BACKEND_URL}
+      - SERVER_URL=${SERVER_URL}
       - CERT_PATH=${CERT_PATH}
       - KEY_PATH=${KEY_PATH}
       - POSTGRES_URL=postgres://user:password@postgres:5432/music
