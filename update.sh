@@ -17,6 +17,16 @@ warn_env() {
     fi
 }
 
+# load env from .env file if it exists
+if [[ -f .env ]]; then
+    echo "** loading .env **"
+    set -a
+    # shellcheck disable=SC2046
+    source .env
+    set +a
+else
+    echo "** no .env file found **"
+fi
 
 require_env SPOTIFY_CLIENT_ID
 require_env SPOTIFY_CLIENT_SECRET
