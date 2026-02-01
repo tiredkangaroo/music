@@ -589,6 +589,7 @@ func releaseDate(d string) pgtype.Date {
 
 func NewLibrary(storagePath string, pool *pgxpool.Pool) *Library {
 	q := queries.New(pool)
+	os.MkdirAll(storagePath, 0755) // especially needed if not using local storage
 	return &Library{
 		storagePath:      storagePath,
 		pool:             pool,
