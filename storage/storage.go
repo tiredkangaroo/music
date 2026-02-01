@@ -45,7 +45,7 @@ func (ls *LocalStorage) Store(ctx context.Context, rd io.Reader, contentType str
 		return "", err
 	}
 
-	return env.DefaultEnv.BackendURL + "/api/v1/data/" + key, nil
+	return env.DefaultEnv.ServerURL + "/api/v1/data/" + key, nil
 }
 
 func (ls *LocalStorage) Load(key string) (io.ReadCloser, error) {

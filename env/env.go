@@ -18,7 +18,7 @@ type Environment struct {
 	KeyPath             string
 	PostgresURL         string
 	DataPath            string
-	BackendURL          string
+	ServerURL           string
 }
 
 var DefaultEnv = Environment{
@@ -31,7 +31,7 @@ var DefaultEnv = Environment{
 
 	StorageURL:       os.Getenv("STORAGE_URL"),
 	StorageAPISecret: os.Getenv("STORAGE_API_SECRET"),
-	BackendURL:       os.Getenv("BACKEND_URL"),
+	ServerURL:        os.Getenv("SERVER_URL"),
 
 	CertPath:    os.Getenv("CERT_PATH"),
 	KeyPath:     os.Getenv("KEY_PATH"),
