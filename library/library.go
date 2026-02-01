@@ -61,6 +61,7 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	logs := new(bytes.Buffer)
 	cmd := exec.Command(env.DefaultEnv.PathToSpotDL, args...)
 	cmd.Stdout = logs
+	cmd.Stderr = logs
 	cmd.Dir = l.storagePath
 
 	if err := cmd.Run(); err != nil {

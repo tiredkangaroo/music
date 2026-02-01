@@ -38,21 +38,14 @@ WORKDIR /app
 COPY --from=backend-builder /backend/music-backend ./music-backend
 COPY --from=frontend-builder /frontend/dist ./ui/dist
 
-# install ca-certificates
-RUN apt-get update && apt-get install -y ca-certificates
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    ffmpeg \
+    wget \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
-# install ffmpeg
-RUN apt-get install -y ffmpeg
-
-# install wget
-RUN apt-get install -y wget
-
-# install yt-dlp
-RUN wget https://github.com/yt-dlp/yt-dlp/releases/download/2026.01.31/yt-dlp -O /usr/local/bin/yt-dlp
-RUN chmod a+rx /usr/local/bin/yt-dlp
-
-# install spotdl
-RUN wget https://github.com/spotDL/spotify-downloader/releases/download/v4.4.3/spotDL -O /usr/local/bin/spotdl
-RUN chmod a+rx /usr/local/bin/spotdl
+RUN pip3 install --no-cache-dir --break-system-packages spotdl yt-dlp
 
 ENTRYPOINT ["./music-backend"]
