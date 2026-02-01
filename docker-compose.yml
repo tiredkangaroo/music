@@ -1,0 +1,41 @@
+services:
+  music:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: music
+    depends_on:
+      - postgres
+    ports:
+      - "${PORT}:${PORT}"
+    volumes:
+      - ./certs:/app/certs
+    command: [ "/music-backend" ]
+    environment:
+      - DEBUG=${DEBUG}
+      - SPOTDL_PATH=/usr/local/bin/spotdl
+      - YT_DLP_PATH=/usr/local/bin/yt-dlp
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - SERVER_ADDRESS=:${PORT}
+      - BACKEND_URL=${BACKEND_URL}
+      - CERT_PATH=${CERT_PATH}
+      - KEY_PATH=${KEY_PATH}
+      - POSTGRES_URL=postgres://user:password@postgres:5432/music
+      - DATA_PATH=/var/lib/music/data
+    restart: unless-stopped
+  postgres:
+    image: postgres:14.15
+    container_name: postgres
+    environment:
+      - POSTGRES_DB=music
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    restart: unless-stopped
+volumes:
+  pgdata:

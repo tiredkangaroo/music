@@ -1,3 +1,14 @@
+# how do i run this?
+
+## docker compose
+
+set the [environment variables](#environment-variables) necessary to run this app
+
+run the docker compose:
+`docker-compose up`
+
+## environment variables
+
 ## things i got to do
 
 - mobile ui

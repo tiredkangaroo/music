@@ -19,12 +19,11 @@ type Environment struct {
 	PostgresURL         string
 	DataPath            string
 	BackendURL          string
-	// GeniusAPIToken      string
 }
 
 var DefaultEnv = Environment{
 	Debug:               dv(os.Getenv("DEBUG"), "false") == "true",
-	PathToSpotDL:        os.Getenv("SPOTDL_PATH"),
+	PathToSpotDL:        dv(os.Getenv("SPOTDL_PATH"), "spotdl"),
 	PathToYtDL:          dv(os.Getenv("YT_DLP_PATH"), "yt-dlp"),
 	SpotifyClientID:     os.Getenv("SPOTIFY_CLIENT_ID"),
 	SpotifyClientSecret: os.Getenv("SPOTIFY_CLIENT_SECRET"),
