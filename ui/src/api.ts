@@ -1,8 +1,6 @@
 import type { PlaylistHead, Playlist, Track, WithError } from "./types.ts";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  "https://home.mechanicaldinosaurs.net:8443/api/v1";
+const API_BASE = import.meta.env.VITE_API_BASE || "/api/v1";
 
 export async function searchTracks(q: string): Promise<Track[]> {
   const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`);

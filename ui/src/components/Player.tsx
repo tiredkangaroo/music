@@ -323,7 +323,7 @@ export function Player(props: {
           onLoadedMetadata={(e) => {
             setDuration(e.currentTarget.duration);
           }}
-          onError={async (e) => {
+          onError={async (_) => {
             const resp = await fetch(
               playTrack(playerState.currentTrack!.track_id),
             );

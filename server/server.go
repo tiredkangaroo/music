@@ -20,7 +20,6 @@ import (
 
 type Server struct {
 	lib     *library.Library
-	queries *db.Queries
 	storage storage.Storage
 }
 
@@ -71,7 +70,7 @@ func (s *Server) Serve() error {
 		if trackID == "" {
 			return c.JSON(400, errormap("trackID parameter is required"))
 		}
-		lyrics, err := s.queries.GetTrackLyrics(c.Request().Context(), trackID)
+		lyrics, err := s.lib.Lyrics(c.Request().Context(), trackID)
 		if err != nil {
 			return c.JSON(500, errormap(err.Error()))
 		}
@@ -240,6 +239,9 @@ func (s *Server) Serve() error {
 	})
 
 	api.GET("/data/:id", func(c echo.Context) error {
+		if _, ok := s.storage.(*storage.RemoteStorage); ok {
+			return c.JSON(400, errormap("data endpoint is only available for local storage"))
+		}
 		key := c.Param("id")
 
 		localStorage := s.storage.(*storage.LocalStorage)
@@ -260,6 +262,15 @@ func (s *Server) Serve() error {
 		return nil
 	})
 
+	// catch all (GET) route to serve frontend
+	e.GET("/*", func(c echo.Context) error {
+		p := c.Request().URL.Path
+		if p == "/" {
+			p = "/index.html"
+		}
+		return c.File(filepath.Join("ui/dist", p))
+	})
+
 	if env.DefaultEnv.CertPath != "" && env.DefaultEnv.KeyPath != "" {
 		slog.Info("starting server with TLS", "address", env.DefaultEnv.ServerAddress)
 		return e.StartTLS(env.DefaultEnv.ServerAddress, env.DefaultEnv.CertPath, env.DefaultEnv.KeyPath)
@@ -270,8 +281,8 @@ func (s *Server) Serve() error {
 
 }
 
-func NewServer(lib *library.Library, q *db.Queries, storage storage.Storage) *Server {
-	return &Server{lib: lib, queries: q, storage: storage}
+func NewServer(lib *library.Library, storage storage.Storage) *Server {
+	return &Server{lib: lib, storage: storage}
 }
 
 func errormap(err string) map[string]string {

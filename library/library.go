@@ -563,6 +563,15 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (queries
 	}, nil
 }
 
+// lyrics returns lyrics for the track with the specified ID + an error if exists.
+func (l *Library) Lyrics(ctx context.Context, trackID string) (string, error) {
+	lyrics, err := l.queries.GetTrackLyrics(ctx, trackID)
+	if err != nil {
+		return "", fmt.Errorf("get track lyrics: %w", err)
+	}
+	return lyrics, nil
+}
+
 func releaseDate(d string) pgtype.Date {
 	var track_date pgtype.Date
 	yr, _ := strconv.Atoi(d)
