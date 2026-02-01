@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: music
     depends_on:
-      - postgres
+      - music-postgres
     ports:
       - "${PORT}:${PORT}"
     volumes:
@@ -21,12 +21,12 @@ services:
       - SERVER_URL=${SERVER_URL}
       - CERT_PATH=${CERT_PATH}
       - KEY_PATH=${KEY_PATH}
-      - POSTGRES_URL=postgres://user:password@postgres:5432/music
+      - POSTGRES_URL=postgres://user:password@music-postgres:5432/music
       - DATA_PATH=/var/lib/music/data
     restart: unless-stopped
-  postgres:
+  music-postgres:
     image: postgres:14.15
-    container_name: postgres
+    container_name: music-postgres
     environment:
       - POSTGRES_DB=music
       - POSTGRES_USER=user
