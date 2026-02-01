@@ -160,6 +160,7 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 			slog.Error("yt-dlp command failed: age-restricted video", "logs", ydlLogs.String())
 			return fmt.Errorf("track is age-restricted")
 		}
+		slog.Error("yt-dlp command failed", "error", err, "logs", ydlLogs.String())
 		return fmt.Errorf("yt-dlp command failed: %w", err)
 	}
 	slog.Debug("downloaded", "track_id", m.ID)
@@ -175,6 +176,18 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	}
 	l.queries.MarkTrackAsDownloaded(context.Background(), m.ID)
 	return nil
+}
+
+// CreateSkeletonTrack creates a skeleton track entry with the track ID (to avoid fkey errors
+// when adding to playlists) but with no metadata. the metadata can be filled in later bc the insert
+// track is upsert.
+func (l *Library) createSkeletonTrack(ctx context.Context, trackID string) error {
+	return l.queries.InsertTrack(ctx, queries.InsertTrackParams{
+		TrackID:          trackID,
+		Artists:          []string{},
+		AlbumReleaseDate: optdate(time.Time{}),
+		TrackReleaseDate: optdate(time.Time{}),
+	})
 }
 
 // DownloadIfNotExists checks if the track with the specified ID exists in storage,
@@ -544,12 +557,13 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (queries
 	}
 
 	for _, track := range tracks {
-		go l.DownloadIfNotExists(track.TrackID) // best effort download in background
-		// not using AddTrackToPlaylist to avoid spawning multiple download goroutines
-		err := l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
-			PlaylistID: optuuid(uuid.MustParse(playlistID)),
-			TrackID:    track.TrackID,
-		})
+		// avoid fkey errors by creating skeleton track entry first
+		err := l.createSkeletonTrack(ctx, track.TrackID)
+		if err != nil {
+			slog.Warn("create skeleton track for imported playlist", "error", err, "track_id", track.TrackID, "playlist_id", playlistID)
+			continue
+		}
+		err = l.AddTrackToPlaylist(ctx, playlistID, track.TrackID)
 		if err != nil {
 			slog.Warn("add track to imported playlist", "error", err, "track_id", track.TrackID, "playlist_id", playlistID)
 		}

@@ -33,6 +33,12 @@ func optstring(s string) pgtype.Text {
 		Valid:  true,
 	}
 }
+func optdate(d time.Time) pgtype.Date {
+	return pgtype.Date{
+		Time:  d,
+		Valid: true,
+	}
+}
 
 func insertParamsFromSearchRow(t queries.SearchTrackByNameRow) queries.InsertTrackParams {
 	return queries.InsertTrackParams{

@@ -70,6 +70,10 @@ export default function App() {
         setCriticalError(null); // clear error if size is now ok
       }
     });
+    return () => {
+      window.removeEventListener("resize", () => {});
+      window.removeEventListener("keydown", () => {});
+    };
   }, []);
 
   function selectPlaylist(id: string) {
@@ -199,6 +203,30 @@ function Sidebar(props: {
       setLoadingSearch(false);
     });
   }
+
+  useEffect(() => {
+    window.addEventListener("keydown", (e) => {
+      const isModifierKey = e.ctrlKey || e.metaKey;
+      if (isModifierKey && e.key === "k") {
+        e.preventDefault();
+        if (sidebarView === "library") {
+          setSidebarView("search");
+          setTimeout(() => {
+            searchTracksInputRef.current?.focus();
+          }, 100);
+        }
+      }
+      if (isModifierKey && e.key === "j") {
+        e.preventDefault();
+        if (sidebarView === "search") {
+          setSidebarView("library");
+        }
+      }
+    });
+    return () => {
+      window.removeEventListener("keydown", () => {});
+    };
+  }, []);
 
   return (
     <div
