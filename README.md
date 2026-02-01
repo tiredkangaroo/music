@@ -26,13 +26,20 @@ run the docker compose:
 | POSTGRES_URL          | required, never if using docker-compose.                                                                       | postgres://musicer:@localhost:5432/music | postgres connection string. docker compose provisions postgres so this should never be specified when using compose.                                                                                                                                                                                  |
 | DATA_PATH             | not required.                                                                                                  | /var/lib/musicer/data                    | directory to store downloaded music and temporary files of metadata. also used as storage if not using [tiredkangaroo/storage](https://github.com/tiredkangaroo/storage) instance.                                                                                                                    |
 
-## things i got to do
+## things i got to do or should do
 
-- mobile ui
-- playlist image chooser to pick square out of the image
-- api for what the user is listening to?? maybe.
-- compact mode?
+### high priority (doesn't mean i'll do them though 😝)
+
+- make direct calls to spotify instead of using spotdl for metadata? (only use spotdl for yt url, which means we can move spotdl and yt-dlp into download and have direct metadata calls for predownload, should speed things up as we won't be using cli calls)
+
+### medium priority
+
 - get around youtube age restriction without using cookies? (ex. can't download from surfer rosa bc album cover)
+- playlist image chooser to pick square out of the image
 
-- begin searching from psql and not spotify search api or both?
+### low priority (things still work or not too important feature):
+
+- compact mode?
+- api for what the user is listening to?? maybe.
+- mobile ui
 - maybe not direct dom manipulation when lyric is clicked?

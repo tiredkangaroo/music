@@ -364,10 +364,18 @@ func (l *Library) RecordSkip(ctx context.Context, playID string, skippedAt int32
 }
 
 func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTrackByNameRow, error) {
+	// var t time.Time
+	// if env.DefaultEnv.Debug {
+	// 	t = time.Now()
+	// 	defer func() {
+	// 		slog.Debug("search completed", "query", query, "duration_ms", time.Since(t).Milliseconds())
+	// 	}()
+	// }
+
 	tracks, err := l.queries.SearchTrackByName(ctx, queries.SearchTrackByNameParams{
 		Column1: optstring(query),
 		Offset:  0,
-		Limit:   25,
+		Limit:   75,
 	})
 	if err != nil {
 		slog.Error("search in db", "error", err)
@@ -375,11 +383,17 @@ func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTra
 	}
 	results := tracks
 
+	if len(results) >= 75 {
+		results = reorderSearchResults(results, query)
+		// slog.Debug("search found enough results in database", "query", query, "count", len(results))
+		return results, nil
+	}
+
 	u, _ := url.Parse("https://api.spotify.com/v1/search")
 	q := u.Query()
 	q.Add("q", query)
 	q.Add("type", "track")
-	q.Add("limit", "25")
+	q.Add("limit", "50")
 	q.Add("offset", "0")
 	u.RawQuery = q.Encode()
 
@@ -457,7 +471,11 @@ func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTra
 		}
 		results = append(results, t)
 	}
+	results = reorderSearchResults(results, query)
+	return results, nil
+}
 
+func reorderSearchResults(results []queries.SearchTrackByNameRow, query string) []queries.SearchTrackByNameRow {
 	slices.SortFunc(results, func(a, b queries.SearchTrackByNameRow) int {
 		// exact matches
 		// on a side note: i love you go for having a built in equal function that does unicode case folding
@@ -502,7 +520,7 @@ func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTra
 		// alphabetical by track name (will almost never reach here)
 		return strings.Compare(a.TrackName, b.TrackName)
 	})
-	return results, nil
+	return results
 }
 
 // Import imports a playlist from Spotify given its playlist ID. It returns the created playlist ID in the local library
