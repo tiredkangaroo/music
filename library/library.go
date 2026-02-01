@@ -3,6 +3,7 @@ package library
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,21 +42,98 @@ type Library struct {
 // link to a spotify track, album or playlist, or it can be a search query like
 // "Blinding Lights - The Weeknd".
 func (l *Library) Download(ctx context.Context, thing string) error {
-	if !l.dlNoDuplicate.Add(thing) {
-		slog.Debug("download already in progress, skipping", "thing", thing)
-		l.dlNoDuplicate.Wait(thing)
-		return nil
+	slog.Info("starting download", "thing", thing)
+	trackID, youtubeURL, err := l.preDownload(thing)
+	if err != nil {
+		return err
 	}
-	defer l.dlNoDuplicate.Remove(thing)
+	err = l.download(trackID, youtubeURL)
+	return nil
+}
 
-	slog.Debug("downloading", "thing", thing)
+// CreateSkeletonTrack creates a skeleton track entry with the track ID (to avoid fkey errors
+// when adding to playlists) but with no metadata. the metadata can be filled in later bc the insert
+// track is upsert.
+func (l *Library) createSkeletonTrack(ctx context.Context, trackID string) error {
+	return l.queries.InsertTrack(ctx, queries.InsertTrackParams{
+		TrackID:          trackID,
+		Artists:          []string{},
+		AlbumReleaseDate: optdate(time.Time{}),
+		TrackReleaseDate: optdate(time.Time{}),
+	})
+}
+
+func (l *Library) download(trackID, youtubeURL string) error {
+	if !l.dlNoDuplicate.Add(youtubeURL) {
+		slog.Info("download already in progress, skipping", "youtube_url", youtubeURL)
+		l.dlNoDuplicate.Wait(youtubeURL)
+		return nil // note: this always returns nil because another goroutine is handling the download
+		// but what if that goroutine fails?
+	}
+	defer l.dlNoDuplicate.Remove(youtubeURL)
+
+	// download audio using yt-dlp
+	ydlArgs := []string{
+		"-x",
+		"--audio-format", "m4a",
+		"--output", filepath.Join(l.storagePath, fmt.Sprintf("%s.m4a", trackID)),
+		"--extractor-args", "youtube:player_client=default,ios,-android_sdkless;formats=missing_pot",
+		"--format", "bv[protocol=m3u8_native]+ba[protocol=m3u8_native]/b[protocol=m3u8_native]",
+	}
+	ydlArgs = append(ydlArgs, youtubeURL)
+
+	ydlLogs := new(bytes.Buffer)
+	ydlCmd := exec.Command("yt-dlp", ydlArgs...)
+	ydlCmd.Stdout = ydlLogs
+	ydlCmd.Stderr = ydlLogs
+	ydlCmd.Dir = l.storagePath
+
+	if err := ydlCmd.Run(); err != nil {
+		if strings.Contains(ydlLogs.String(), "This video is age-restricted") {
+			// slog.Error("yt-dlp command failed: age-restricted video", "logs", ydlLogs.String())
+			return fmt.Errorf("track is age-restricted")
+		}
+		// slog.Error("yt-dlp command failed", "error", err, "logs", ydlLogs.String())
+		return fmt.Errorf("yt-dlp command failed: %w", err)
+	}
+	slog.Info("downloaded", "track_id", trackID)
+	// see if there's any mp4 files and delete them (yt-dlp creates audioless mp4 files?? idk what the option is to stop that)
+	files, err := os.ReadDir(l.storagePath)
+	if err != nil {
+		return fmt.Errorf("read storage directory: %w", err)
+	}
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".mp4") {
+			os.Remove(filepath.Join(l.storagePath, file.Name()))
+		}
+	}
+	l.queries.MarkTrackAsDownloaded(context.Background(), trackID)
+	return nil
+}
+
+// downloadIfNotExists checks if the track with the specified ID exists in storage,
+// and downloads it if it is missing.
+func (l *Library) downloadIfNotExists(trackID, youtubeURL string) error {
+	p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		return l.download(trackID, youtubeURL)
+	}
+	return nil
+}
+
+// preDownload performs the steps before downloading (metadata & youtube url extraction).
+// returns the track ID, youtube URL and any error encountered. note: do we need a preDownloadIfNotExists?
+// also note: do we need a noDupeDl here?
+func (l *Library) preDownload(thing string) (string, string, error) {
+	slog.Info("pre-downloading", "thing", thing)
 	// steps: spotdl url and metadata download
 	// read youtube url (split by \n, idx 1) then read metadata and insert into db
 	// then use yt-dlp to download audio files
 	// spotdl url [thing] --save-file metadata.spotdl --client-id [client id] --client-secret [client secret]
+	safeThingName := sha256.Sum256([]byte(thing)) // use hashed name to avoid issues with special characters in filenames & using different names for different things bc multiple downloads can happen simultaneously
 	args := []string{"url"}
 	args = append(args, thing)
-	args = append(args, "--save-file", filepath.Join(l.storagePath, "metadata.spotdl"))
+	args = append(args, "--save-file", filepath.Join(l.storagePath, fmt.Sprintf("%x-metadata.spotdl", safeThingName)))
 	args = append(args, "--client-id", env.DefaultEnv.SpotifyClientID)
 	args = append(args, "--client-secret", env.DefaultEnv.SpotifyClientSecret)
 
@@ -65,12 +144,12 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	cmd.Dir = l.storagePath
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("spotdl command failed: %w\nlogs: %s", err, logs.String())
+		return "", "", fmt.Errorf("spotdl command failed: %w\nlogs: %s", err, logs.String())
 	}
 	ytURLmatches := l.youtubeURLRegexp.FindAllString(logs.String(), -1)
 	if len(ytURLmatches) == 0 {
 		slog.Error("could not find youtube url in spotdl output", "logs", logs.String())
-		return fmt.Errorf("could not find youtube url in spotdl output")
+		return "", "", fmt.Errorf("could not find youtube url in spotdl output")
 	}
 	youtubeURL := ytURLmatches[0]
 	slog.Debug("found youtube url", "url", youtubeURL)
@@ -78,10 +157,10 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	args[0] = "save"
 	args = append(args, "--lyrics", "synced", "--generate-lrc")
 	if err := exec.Command(env.DefaultEnv.PathToSpotDL, args...).Run(); err != nil {
-		return fmt.Errorf("spotdl save command failed: %w", err)
+		return "", "", fmt.Errorf("spotdl save command failed: %w", err)
 	}
 
-	mdfile := filepath.Join(l.storagePath, "metadata.spotdl")
+	mdfile := filepath.Join(l.storagePath, fmt.Sprintf("%x-metadata.spotdl", safeThingName))
 	defer os.Remove(mdfile)
 
 	type trackMetadata struct {
@@ -102,14 +181,14 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	var metadataList []trackMetadata
 	metadata, err := os.ReadFile(mdfile)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	err = json.Unmarshal(metadata, &metadataList)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	if len(metadataList) == 0 {
-		return fmt.Errorf("no metadata found in spotdl output")
+		return "", "", fmt.Errorf("no metadata found in spotdl output")
 	}
 
 	m := metadataList[0]
@@ -136,58 +215,9 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 		Lyrics:           m.Lyrics,
 	})
 	if err != nil {
-		return fmt.Errorf("insert track: %w", err)
+		return "", "", fmt.Errorf("insert track: %w", err)
 	}
-
-	// download audio using yt-dlp
-	ydlArgs := []string{
-		"-x",
-		"--audio-format", "m4a",
-		"--output", filepath.Join(l.storagePath, fmt.Sprintf("%s.m4a", m.ID)),
-		"--extractor-args", "youtube:player_client=default,ios,-android_sdkless;formats=missing_pot",
-		"--format", "bv[protocol=m3u8_native]+ba[protocol=m3u8_native]/b[protocol=m3u8_native]",
-	}
-	ydlArgs = append(ydlArgs, youtubeURL)
-
-	ydlLogs := new(bytes.Buffer)
-	ydlCmd := exec.Command("yt-dlp", ydlArgs...)
-	ydlCmd.Stdout = ydlLogs
-	ydlCmd.Stderr = ydlLogs
-	ydlCmd.Dir = l.storagePath
-
-	if err := ydlCmd.Run(); err != nil {
-		if strings.Contains(ydlLogs.String(), "This video is age-restricted") {
-			slog.Error("yt-dlp command failed: age-restricted video", "logs", ydlLogs.String())
-			return fmt.Errorf("track is age-restricted")
-		}
-		slog.Error("yt-dlp command failed", "error", err, "logs", ydlLogs.String())
-		return fmt.Errorf("yt-dlp command failed: %w", err)
-	}
-	slog.Debug("downloaded", "track_id", m.ID)
-	// see if there's any mp4 files and delete them (yt-dlp creates audioless mp4 files?? idk what the option is to stop that)
-	files, err := os.ReadDir(l.storagePath)
-	if err != nil {
-		return fmt.Errorf("read storage directory: %w", err)
-	}
-	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".mp4") {
-			os.Remove(filepath.Join(l.storagePath, file.Name()))
-		}
-	}
-	l.queries.MarkTrackAsDownloaded(context.Background(), m.ID)
-	return nil
-}
-
-// CreateSkeletonTrack creates a skeleton track entry with the track ID (to avoid fkey errors
-// when adding to playlists) but with no metadata. the metadata can be filled in later bc the insert
-// track is upsert.
-func (l *Library) createSkeletonTrack(ctx context.Context, trackID string) error {
-	return l.queries.InsertTrack(ctx, queries.InsertTrackParams{
-		TrackID:          trackID,
-		Artists:          []string{},
-		AlbumReleaseDate: optdate(time.Time{}),
-		TrackReleaseDate: optdate(time.Time{}),
-	})
+	return m.ID, youtubeURL, nil
 }
 
 // DownloadIfNotExists checks if the track with the specified ID exists in storage,
@@ -556,18 +586,24 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (queries
 		return queries.Playlist{}, fmt.Errorf("create playlist in library: %w", err)
 	}
 
-	for _, track := range tracks {
-		// avoid fkey errors by creating skeleton track entry first
-		err := l.createSkeletonTrack(ctx, track.TrackID)
-		if err != nil {
-			slog.Warn("create skeleton track for imported playlist", "error", err, "track_id", track.TrackID, "playlist_id", playlistID)
-			continue
-		}
-		err = l.AddTrackToPlaylist(ctx, playlistID, track.TrackID)
-		if err != nil {
-			slog.Warn("add track to imported playlist", "error", err, "track_id", track.TrackID, "playlist_id", playlistID)
-		}
+	wg := sync.WaitGroup{}
+	for _, ctrack := range tracks {
+		wg.Add(1)
+		go func(track queries.InsertTrackParams) {
+			defer wg.Done()
+			// avoid fkey errors by doing predownload which also inserts the track metadata
+			_, youtubeURL, err := l.preDownload("https://open.spotify.com/track/" + track.TrackID)
+			if err != nil {
+				slog.Warn("pre-download track for imported playlist", "error", err, "track_id", track.TrackID)
+			}
+			go l.downloadIfNotExists(track.TrackID, youtubeURL) // best effort dl in seperate goroutine
+			err = l.AddTrackToPlaylist(ctx, playlistID, track.TrackID)
+			if err != nil {
+				slog.Warn("add track to imported playlist", "error", err, "track_id", track.TrackID, "playlist_id", playlistID)
+			}
+		}(ctrack)
 	}
+	wg.Wait()
 
 	return queries.Playlist{
 		ID:          optuuid(uuid.MustParse(playlistID)),
