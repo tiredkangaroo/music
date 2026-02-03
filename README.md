@@ -30,7 +30,7 @@ run the docker compose:
 
 ### high priority (doesn't mean i'll do them though 😝)
 
-- make direct calls to spotify instead of using spotdl for metadata? (only use spotdl for yt url, which means we can move spotdl and yt-dlp into download and have direct metadata calls for predownload, should speed things up as we won't be using cli calls)
+- make direct calls to spotify instead of using spotdl for metadata? (only use spotdl for yt url, which means we can move spotdl and yt-dlp into download and have direct metadata calls for predownload, should speed things up as we won't be using cli calls, but i would need to find a way to get lyrics or still keep spotdl for lyrics)
 
 ### medium priority
 

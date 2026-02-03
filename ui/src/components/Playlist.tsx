@@ -8,9 +8,11 @@ import {
   recordPlay,
   recordSkip,
   removeTrackFromPlaylist,
+  requestDownload,
   searchTracks,
 } from "../api";
 import { PlayerContext, SetPlayerContext } from "../PlayerContext.tsx";
+import { SetAlertMessageContext } from "../AlertMessageContext.tsx";
 export function PlaylistView(props: {
   playlist: Playlist;
   setPlaylist: (playlist: Playlist) => void;
@@ -20,6 +22,9 @@ export function PlaylistView(props: {
   const playerState = useContext(PlayerContext);
   const setPlayerState = useContext(SetPlayerContext);
   const addTracksDialogRef = useRef<HTMLDialogElement>(null);
+
+  const setAlertMessage = useContext(SetAlertMessageContext);
+  const [downloading, setDownloading] = useState(false);
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -208,6 +213,63 @@ export function PlaylistView(props: {
                   <path d="M3 6h18" />
                   <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                 </svg>
+              </button>
+              <button
+                onClick={() => {
+                  setDownloading(true);
+                  let wg = playlist.tracks.length;
+                  function doneTrack() {
+                    wg -= 1;
+                    if (wg === 0) {
+                      setDownloading(false);
+                    }
+                  }
+                  for (let i = 0; i < playlist.tracks.length; i++) {
+                    requestDownload(playlist.tracks[i].track_id).then(
+                      (resp) => {
+                        doneTrack();
+                        if (resp.error) {
+                          setAlertMessage(
+                            `Downloading "${playlist.tracks[i].track_name}": ${resp.error}`,
+                          );
+                        }
+                      },
+                    );
+                  }
+                }}
+              >
+                {downloading ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="animate-spin animate-spin-slow"
+                  >
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#4d2db5"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 17V3" />
+                    <path d="m6 11 6 6 6-6" />
+                    <path d="M19 21H5" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>

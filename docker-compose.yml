@@ -23,6 +23,7 @@ services:
       - KEY_PATH=${KEY_PATH}
       - STORAGE_URL=${STORAGE_URL}
       - STORAGE_API_SECRET=${STORAGE_API_SECRET}
+      - MAX_CONCURRENT_DOWNLOADS=${MAX_CONCURRENT_DOWNLOADS}
       - POSTGRES_URL=postgres://user:password@music-postgres:5432/music
       - DATA_PATH=/var/lib/music/data
     restart: unless-stopped

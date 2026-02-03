@@ -125,7 +125,15 @@ func (l *Library) download(trackID, youtubeURL string) error {
 func (l *Library) downloadIfNotExists(trackID, youtubeURL string) error {
 	p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
 	if _, err := os.Stat(p); os.IsNotExist(err) {
-		return l.download(trackID, youtubeURL)
+		for range 3 { // try downloading 3 times
+			if err := l.download(trackID, youtubeURL); err != nil {
+				if strings.Contains(err.Error(), "age-restricted") {
+					return err
+				}
+			} else {
+				return nil
+			}
+		}
 	} else {
 		slog.Info("track already exists, skipping download", "track_id", trackID)
 		l.queries.MarkTrackAsDownloaded(context.Background(), trackID)
@@ -446,6 +454,9 @@ func (l *Library) Search(ctx context.Context, query string) ([]queries.SearchTra
 			coverURL = item.Album.Images[0].URL
 		}
 		rd := releaseDate(item.Album.ReleaseDate)
+		if !rd.Valid {
+			rd = optdate(time.Now())
+		}
 		t := queries.SearchTrackByNameRow{
 			ArtistID:   item.Artists[0].ID,
 			ArtistName: item.Artists[0].Name,

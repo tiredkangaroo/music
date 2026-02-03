@@ -37,6 +37,8 @@ warn_env STORAGE_URL
 warn_env STORAGE_API_SECRET
 warn_env CERT_PATH
 warn_env KEY_PATH
+warn_env DEBUG
+warn_env MAX_CONCURRENT_DOWNLOADS
 
 # wow look so fancy, asking for confirmation 🥹✌️
 echo -n "Do you wish to proceed? [y/N] "

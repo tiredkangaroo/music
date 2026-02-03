@@ -625,6 +625,10 @@ function NewPlaylistDialog(props: {
         </div>
         <div>
           <h1 className="text-3xl font-bold">Import</h1>
+          <p className="text-gray-500">
+            Note: importing playlists can take a long time (depending on number
+            of tracks).
+          </p>
           <input
             className="p-2 border border-black w-full mt-4 resize-none"
             placeholder="Spotify Playlist URL"
