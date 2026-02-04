@@ -91,27 +91,29 @@ export function LyricsView(props: {
 
   return (
     <div className="max-w-[30vw] bg-gray-100 border-l-4 border-black p-4 overflow-y-auto">
-      <div className="w-full flex flex-row justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Lyrics</h1>
-        <button
-          onClick={() => props.setIsOpen(false)}
-          aria-label="Close lyrics"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+      <div className="sticky top-0 pt-0 mb-4">
+        <div className="w-full flex flex-row justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold">Lyrics</h1>
+          <button
+            onClick={() => props.setIsOpen(false)}
+            aria-label="Close lyrics"
           >
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 py-8">
