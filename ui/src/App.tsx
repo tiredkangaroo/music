@@ -337,11 +337,10 @@ function Sidebar(props: {
           onClick={() => {
             setSidebarView("search");
           }}
-          className="bg-blue-300 p-2 border-l-2 border-t-2 border-black"
+          className="p-2 border-l-2 border-t-2 border-black border-r-6 border-b-6"
           style={{
             scale: sidebarView === "search" ? 1 : 0.95,
-            borderRightWidth: sidebarView === "search" ? "4px" : "6px",
-            borderBottomWidth: sidebarView === "search" ? "4px" : "6px",
+            borderColor: sidebarView === "search" ? "#193cb8" : "black",
           }}
         >
           <svg
@@ -363,12 +362,12 @@ function Sidebar(props: {
           onClick={() => {
             setSidebarView("library");
           }}
-          className="bg-blue-300 p-2 border-l-2 border-t-2 border-r-6 border-b-6 border-black"
+          className="p-2 border-l-2 border-t-2 border-r-6 border-b-6 border-black"
           style={{
             scale: sidebarView === "library" ? 1 : 0.95,
-            borderRightWidth: sidebarView === "library" ? "4px" : "6px",
-            borderBottomWidth: sidebarView === "library" ? "4px" : "6px",
-            // borderWidth: sidebarView === "library" ? "6px" : "4px",
+            // borderRightWidth: sidebarView === "library" ? "4px" : "6px",
+            // borderBottomWidth: sidebarView === "library" ? "4px" : "6px",
+            borderColor: sidebarView === "library" ? "#193cb8" : "black",
           }}
         >
           <svg

@@ -35,7 +35,7 @@ type Library struct {
 
 	spotifyToken *spotifyToken
 
-	dlNoDuplicate *noDuplicate
+	dlNoDuplicate *noDuplicate[error]
 	// we're using maximum ongoing downloads now because i think the # of 403 from yt increases and is related to too many concurrent download (only really happens when importing and not single track downloads)
 	ongoingDownloads        *slots
 	maximumOngoingDownloads int
@@ -80,7 +80,6 @@ func (l *Library) download(trackID, youtubeURL string) error {
 		return nil // note: this always returns nil because another goroutine is handling the download
 		// but what if that goroutine fails?
 	}
-	defer l.dlNoDuplicate.Remove(youtubeURL)
 
 	// download audio using yt-dlp
 	ydlArgs := []string{
@@ -100,8 +99,11 @@ func (l *Library) download(trackID, youtubeURL string) error {
 
 	if err := ydlCmd.Run(); err != nil {
 		if strings.Contains(ydlLogs.String(), "This video is age-restricted") {
-			return fmt.Errorf("track is age-restricted")
+			err = fmt.Errorf("track is age-restricted")
+			l.dlNoDuplicate.Remove(youtubeURL, err)
+			return err
 		}
+		l.dlNoDuplicate.Remove(youtubeURL, err)
 		slog.Error("yt-dlp command failed", "error", err, "logs", ydlLogs.String())
 		return fmt.Errorf("yt-dlp command failed: %w", err)
 	}
@@ -109,6 +111,7 @@ func (l *Library) download(trackID, youtubeURL string) error {
 	// see if there's any mp4 files and delete them (yt-dlp creates audioless mp4 files?? idk what the option is to stop that)
 	files, err := os.ReadDir(l.storagePath)
 	if err != nil {
+		l.dlNoDuplicate.Remove(youtubeURL, err)
 		return fmt.Errorf("read storage directory: %w", err)
 	}
 	for _, file := range files {
@@ -116,6 +119,7 @@ func (l *Library) download(trackID, youtubeURL string) error {
 			os.Remove(filepath.Join(l.storagePath, file.Name()))
 		}
 	}
+	l.dlNoDuplicate.Remove(youtubeURL, nil)
 	l.queries.MarkTrackAsDownloaded(context.Background(), trackID)
 	return nil
 }
@@ -686,7 +690,7 @@ func NewLibrary(storagePath string, pool *pgxpool.Pool) *Library {
 		pool:                    pool,
 		queries:                 q,
 		spotifyToken:            new(spotifyToken),
-		dlNoDuplicate:           newNoDuplicate(),
+		dlNoDuplicate:           newNoDuplicate[error](),
 		youtubeURLRegexp:        regexp.MustCompile(`https://(?:music\.)?youtube\.com/[^\s]+`),
 		ongoingDownloads:        newSlots(env.DefaultEnv.MaximumOngoingDownloads),
 		maximumOngoingDownloads: env.DefaultEnv.MaximumOngoingDownloads,
