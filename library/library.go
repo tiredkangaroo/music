@@ -274,6 +274,13 @@ func (l *Library) ListPlaylists(ctx context.Context) ([]queries.Playlist, error)
 
 // CreatePlaylist creates a new playlist with the specified name and returns its ID and any error if encountered.
 func (l *Library) CreatePlaylist(ctx context.Context, name string, description string, imageURL string) (string, error) {
+	exists, err := l.queries.PlaylistWithNameExists(ctx, name)
+	if err != nil {
+		return "", fmt.Errorf("check if playlist with name exists: %w", err)
+	}
+	if exists {
+		return "", fmt.Errorf("playlist names must be unique")
+	}
 	id, err := l.queries.CreatePlaylist(ctx, queries.CreatePlaylistParams{
 		Name:        name,
 		Description: description,

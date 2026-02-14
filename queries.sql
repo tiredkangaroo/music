@@ -133,3 +133,8 @@ WHERE track_id = $1;
 UPDATE tracks
 SET downloaded = FALSE
 WHERE track_id = $1;
+
+-- name: PlaylistWithNameExists :one
+SELECT EXISTS (
+    SELECT 1 FROM playlists WHERE name = $1
+);

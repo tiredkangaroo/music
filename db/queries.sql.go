@@ -282,6 +282,19 @@ func (q *Queries) MarkTrackAsNotDownloaded(ctx context.Context, trackID string) 
 	return err
 }
 
+const playlistWithNameExists = `-- name: PlaylistWithNameExists :one
+SELECT EXISTS (
+    SELECT 1 FROM playlists WHERE name = $1
+)
+`
+
+func (q *Queries) PlaylistWithNameExists(ctx context.Context, name string) (bool, error) {
+	row := q.db.QueryRow(ctx, playlistWithNameExists, name)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const recordPlay = `-- name: RecordPlay :one
 INSERT INTO plays (track_id, played_at, skipped_at)
 VALUES ($1, $2, $3)
