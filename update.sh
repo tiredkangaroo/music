@@ -56,9 +56,17 @@ if [[ ! -v PORT ]]; then
     export PORT
 fi
 
-# docker compose down
-echo "** docker compose down **"
-docker compose down
+# ask if user wants to remove volumes
+echo -n "Do you want to remove volumes in docker-compose? This will delete all data (y/N) "
+read -r REMOVE_VOLUMES
+
+if [[ "$REMOVE_VOLUMES" =~ ^[Yy]$ ]]; then
+    echo "** docker compose down -v **"
+    docker compose down -v
+else
+    echo "** docker compose down **"
+    docker compose down
+fi
 
 # update the repo
 echo "** git pull **"

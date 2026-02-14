@@ -1,3 +1,34 @@
+# what is this?
+
+it's a music downloader and player app. this is not a streaming app! this is also not a social app or an app for podcasts.
+
+## features
+
+- search for tracks on spotify & play them
+- create & delete playlists
+- add & remove tracks from playlists
+- play music from a playlist either in order or with shuffle
+- view & modify the queue
+- see time-synced lyrics as the track plays
+- download individual tracks or all tracks in a playlist
+
+### features i thought were cool and deserved to be said even though they don't usually belong in features lists
+
+- errors get properly sent back to the ui and displayed
+- you can send multiple downloads for a track and only one download will occur (and if there's an error in that one download, the responses to all requests will show that error).
+- the search is ordered effectively and results get cached in the psql db so it can be faster
+- the update.sh script is so useful
+
+## download process
+
+- it uses [spotdl](https://github.com/spotDL/spotify-downloader) to retrieve metadata about tracks and links to their corresponding music tracks on youtube.
+- this metadata is saved into the database.
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) is then used to download the music track from youtube.
+
+## searching
+
+the search is done using the spotify search api. it's taken a [recent hit](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide), with the loss of the popularity field, while i was making this app.
+
 # demo?
 
 yeah! it's [here](https://music.mechanicaldinosaurs.net).
