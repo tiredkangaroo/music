@@ -124,6 +124,22 @@ func (s *Server) Serve() error {
 		Description string `json:"description"`
 		ImageURL    string `json:"image_url"`
 	}) error {
+		// validations (this was made so i can return errors to test error handling in the frontend lol)
+		if req.Name == "" {
+			return c.JSON(400, errormap("name is required"))
+		}
+		if req.Description == "" {
+			return c.JSON(400, errormap("description is required"))
+		}
+		if req.ImageURL == "" {
+			return c.JSON(400, errormap("image is required"))
+		}
+		if len(req.Name) > 30 {
+			return c.JSON(400, errormap("name may be at most 30 characters"))
+		}
+		if len(req.Description) > 60 {
+			return c.JSON(400, errormap("description may be at most 60 characters"))
+		}
 		playlistID, err := s.lib.CreatePlaylist(c.Request().Context(), req.Name, req.Description, req.ImageURL)
 		if err != nil {
 			return c.JSON(500, errormap(err.Error()))

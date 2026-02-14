@@ -318,6 +318,8 @@ function SearchDialog(props: {
   const { playlist, addTracksDialogRef, setPlaylist } = props;
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchResults, setSearchResults] = useState<Array<Track>>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!searchInputRef.current) return;
@@ -327,7 +329,14 @@ function SearchDialog(props: {
         setSearchResults([]);
         return;
       }
+      setSearchLoading(true);
       searchTracks(query).then((results) => {
+        setSearchLoading(false);
+        if (results.error) {
+          setSearchResults([]);
+          setSearchError(results.error);
+          return;
+        }
         setSearchResults(results);
       });
     };
@@ -336,6 +345,63 @@ function SearchDialog(props: {
       searchInputRef.current?.removeEventListener("input", handleSearchInput);
     };
   }, [searchInputRef.current]);
+
+  function DisplaySearchMainContent() {
+    if (searchInputRef.current && searchInputRef.current.value.length === 0) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center">
+          <p className="text-gray-500">
+            Search for tracks to add to the playlist
+          </p>
+        </div>
+      );
+    }
+    if (searchLoading) {
+      return (
+        <div className="w-full h-full flex flex-col items-center gap-4 justify-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            className="animate-spin"
+          >
+            <path d="M12 2v4" />
+            <path d="m16.2 7.8 2.9-2.9" />
+            <path d="M18 12h4" />
+            <path d="m16.2 16.2 2.9 2.9" />
+            <path d="M12 18v4" />
+            <path d="m4.9 19.1 2.9-2.9" />
+            <path d="M2 12h4" />
+            <path d="m4.9 4.9 2.9 2.9" />
+          </svg>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-4 overflow-y-auto px-6">
+        {searchResults.map((track) => (
+          <TrackView
+            key={track.track_id}
+            track={track}
+            addTrack={() => {
+              addTrackToPlaylist(playlist.id, track.track_id).then(() => {
+                getPlaylist(playlist.id).then((updatedPlaylist) => {
+                  setPlaylist(updatedPlaylist);
+                });
+              });
+            }}
+            compact
+          />
+        ))}
+      </div>
+    );
+  }
   return (
     <dialog ref={addTracksDialogRef} className="m-auto">
       <div className="min-w-fit w-[45vw] h-[80vh] p-4 border-r-10 border-b-10 border-t-4 border-l-4 border-black bg-white flex flex-col gap-4">
@@ -355,22 +421,12 @@ function SearchDialog(props: {
           placeholder="Search for a track"
           ref={searchInputRef}
         ></input>
-        <div className="flex flex-col gap-4 overflow-y-auto px-6">
-          {searchResults.map((track) => (
-            <TrackView
-              key={track.track_id}
-              track={track}
-              addTrack={() => {
-                addTrackToPlaylist(playlist.id, track.track_id).then(() => {
-                  getPlaylist(playlist.id).then((updatedPlaylist) => {
-                    setPlaylist(updatedPlaylist);
-                  });
-                });
-              }}
-              compact
-            />
-          ))}
-        </div>
+        {searchError && (
+          <div className="bg-red-100 p-2 border-r-6 border-b-6 border-l-2 border-t-2 border-red-700">
+            <p className="text-red-500 text-sm">Search Error: {searchError}</p>
+          </div>
+        )}
+        <DisplaySearchMainContent></DisplaySearchMainContent>
       </div>
     </dialog>
   );

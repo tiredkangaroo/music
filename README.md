@@ -14,7 +14,7 @@ it's a music downloader and player app. this is not a streaming app! this is als
 
 ### features i thought were cool and deserved to be said even though they don't usually belong in features lists
 
-- errors get properly sent back to the ui and displayed
+- errors get properly sent back to the ui and displayed (new playlist, import playlist, playing a track error)
 - you can send multiple downloads for a track and only one download will occur (and if there's an error in that one download, the responses to all requests will show that error).
 - the search is ordered effectively and results get cached in the psql db so it can be faster
 - the update.sh script is so useful

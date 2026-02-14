@@ -35,6 +35,7 @@ type Library struct {
 
 	spotifyToken *spotifyToken
 
+	// mini thing abt no dupe: importing playlists does not use dlNoDuplicate
 	dlNoDuplicate *noDuplicate[error]
 	// we're using maximum ongoing downloads now because i think the # of 403 from yt increases and is related to too many concurrent download (only really happens when importing and not single track downloads)
 	ongoingDownloads        *slots
@@ -48,11 +49,19 @@ type Library struct {
 // "Blinding Lights - The Weeknd".
 func (l *Library) Download(ctx context.Context, thing string) error {
 	slog.Info("starting download", "thing", thing)
+
+	if !l.dlNoDuplicate.Add(thing) { // make sure we only do the preDownload() -> download() flow once
+		slog.Info("download already in progress, skipping", "thing", thing)
+		return l.dlNoDuplicate.Wait(thing)
+	}
+
 	trackID, youtubeURL, err := l.preDownload(thing)
 	if err != nil {
+		l.dlNoDuplicate.Remove(thing, err)
 		return err
 	}
 	err = l.download(trackID, youtubeURL)
+	l.dlNoDuplicate.Remove(thing, err)
 	return err
 }
 
@@ -73,14 +82,6 @@ func (l *Library) download(trackID, youtubeURL string) error {
 	l.ongoingDownloads.Acquire()
 	defer l.ongoingDownloads.Release()
 
-	// check for duplicate downloads
-	if !l.dlNoDuplicate.Add(youtubeURL) {
-		slog.Info("download already in progress, skipping", "youtube_url", youtubeURL)
-		l.dlNoDuplicate.Wait(youtubeURL)
-		return nil // note: this always returns nil because another goroutine is handling the download
-		// but what if that goroutine fails?
-	}
-
 	// download audio using yt-dlp
 	ydlArgs := []string{
 		"-x",
@@ -100,10 +101,8 @@ func (l *Library) download(trackID, youtubeURL string) error {
 	if err := ydlCmd.Run(); err != nil {
 		if strings.Contains(ydlLogs.String(), "This video is age-restricted") {
 			err = fmt.Errorf("track is age-restricted")
-			l.dlNoDuplicate.Remove(youtubeURL, err)
 			return err
 		}
-		l.dlNoDuplicate.Remove(youtubeURL, err)
 		slog.Error("yt-dlp command failed", "error", err, "logs", ydlLogs.String())
 		return fmt.Errorf("yt-dlp command failed: %w", err)
 	}
@@ -111,7 +110,6 @@ func (l *Library) download(trackID, youtubeURL string) error {
 	// see if there's any mp4 files and delete them (yt-dlp creates audioless mp4 files?? idk what the option is to stop that)
 	files, err := os.ReadDir(l.storagePath)
 	if err != nil {
-		l.dlNoDuplicate.Remove(youtubeURL, err)
 		return fmt.Errorf("read storage directory: %w", err)
 	}
 	for _, file := range files {
@@ -119,7 +117,6 @@ func (l *Library) download(trackID, youtubeURL string) error {
 			os.Remove(filepath.Join(l.storagePath, file.Name()))
 		}
 	}
-	l.dlNoDuplicate.Remove(youtubeURL, nil)
 	l.queries.MarkTrackAsDownloaded(context.Background(), trackID)
 	return nil
 }
@@ -150,6 +147,7 @@ func (l *Library) downloadIfNotExists(trackID, youtubeURL string) error {
 // also note: do we need a noDupeDl here?
 func (l *Library) preDownload(thing string) (string, string, error) {
 	slog.Info("pre-downloading", "thing", thing)
+
 	// steps: spotdl url and metadata download
 	// read youtube url (split by \n, idx 1) then read metadata and insert into db
 	// then use yt-dlp to download audio files
@@ -637,10 +635,15 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (queries
 		go func(track queries.InsertTrackParams) {
 			defer wg.Done()
 			// avoid fkey errors by doing predownload which also inserts the track metadata
-			_, youtubeURL, err := l.preDownload("https://open.spotify.com/track/" + track.TrackID)
+			trackURL := "https://open.spotify.com/track/" + track.TrackID
+
+			_, youtubeURL, err := l.preDownload(trackURL)
+			l.dlNoDuplicate.Remove(trackURL, err)
 			if err != nil {
 				slog.Warn("pre-download track for imported playlist", "error", err, "track_id", track.TrackID)
+				return
 			}
+
 			go l.downloadIfNotExists(track.TrackID, youtubeURL)
 			err = l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
 				PlaylistID: optuuid(uuid.MustParse(playlistID)),

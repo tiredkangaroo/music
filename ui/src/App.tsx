@@ -406,6 +406,7 @@ function NewPlaylistDialog(props: {
   const newPlaylistDescriptionRef = useRef<HTMLTextAreaElement>(null);
   const importPlaylistURLInputRef = useRef<HTMLInputElement>(null);
   const [importPlaylistLoading, setImportPlaylistLoading] = useState(false);
+  const [createPlaylistLoading, setCreatePlaylistLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   async function handleCreatePlaylist() {
@@ -429,7 +430,13 @@ function NewPlaylistDialog(props: {
     const imageURL = await uploadImage(imageFile);
     console.log("uploaded image", imageURL);
 
+    setCreatePlaylistLoading(true);
     createPlaylist(name, description, imageURL).then((resp) => {
+      if (resp.error) {
+        setErrorMessage(resp.error);
+        setCreatePlaylistLoading(false);
+        return;
+      }
       const newPlaylistID = resp.playlist_id as string;
       setPlaylists([
         {
@@ -448,6 +455,7 @@ function NewPlaylistDialog(props: {
       newPlaylistImageRef.current!.value = "";
       setErrorMessage("");
       setSelectedPlaylist(newPlaylistID);
+      setCreatePlaylistLoading(false);
       newPlaylistDialogRef.current?.close();
     });
   }
@@ -615,7 +623,31 @@ function NewPlaylistDialog(props: {
           className="bg-blue-500 text-white px-4 py-2 rounded"
           onClick={handleCreatePlaylist}
         >
-          Create
+          {createPlaylistLoading ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              className="animate-spin mx-auto"
+            >
+              <path d="M12 2v4" />
+              <path d="m16.2 7.8 2.9-2.9" />
+              <path d="M18 12h4" />
+              <path d="m16.2 16.2 2.9 2.9" />
+              <path d="M12 18v4" />
+              <path d="m4.9 19.1 2.9-2.9" />
+              <path d="M2 12h4" />
+              <path d="m4.9 4.9 2.9 2.9" />
+            </svg>
+          ) : (
+            "Create"
+          )}
         </button>
         <div className="flex flex-row items-center gap-2">
           <hr className="flex-1 border-t-2 border-black" />
@@ -625,8 +657,8 @@ function NewPlaylistDialog(props: {
         <div>
           <h1 className="text-3xl font-bold">Import</h1>
           <p className="text-gray-500">
-            Note: importing playlists can take a long time (depending on number
-            of tracks).
+            Note: the playlist must be public. importing playlists can take a
+            long time (depending on number of tracks).
           </p>
           <input
             className="p-2 border border-black w-full mt-4 resize-none"

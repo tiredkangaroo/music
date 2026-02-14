@@ -2,7 +2,7 @@ import type { PlaylistHead, Playlist, Track, WithError } from "./types.ts";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api/v1";
 
-export async function searchTracks(q: string): Promise<Track[]> {
+export async function searchTracks(q: string): Promise<WithError<Track[]>> {
   const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`);
   if (!res.ok) throw new Error("Search failed");
   return res.json();
@@ -26,7 +26,7 @@ export async function createPlaylist(
   name: string,
   description: string,
   image_url: string,
-) {
+): Promise<WithError<{ playlist_id: string }>> {
   const res = await fetch(`${API_BASE}/playlists`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
