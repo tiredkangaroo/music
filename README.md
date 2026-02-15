@@ -27,7 +27,7 @@ it's a music downloader and player app. this is not a streaming app! this is als
 
 ## searching
 
-the search is done using the spotify search api. it's taken a [recent hit](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide), with the loss of the popularity field, while i was making this app.
+the search is done using the spotify search api. it's taken a [recent hit](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide) with the loss of the popularity field, while i was making this app.
 
 # demo?
 
@@ -66,13 +66,13 @@ run the docker compose:
 ### high priority (doesn't mean i'll do them though 😝)
 
 - bugsquashing efforts
-- optimize downloads
+- optimize downloads (quite vague ik)
 - make direct calls to spotify instead of using spotdl for metadata? (only use spotdl for yt url, which means we can move spotdl and yt-dlp into download and have direct metadata calls for predownload, should speed things up as we won't be using cli calls, but i would need to find a way to get lyrics or still keep spotdl for lyrics)
 
 ### medium priority
 
 - get around youtube age restriction without using cookies? (ex. can't download from surfer rosa bc album cover)
-- playlist image chooser to pick square out of the image
+- update the download button status once downloaded or with loading icon
 
 ### low priority (things still work or not too important feature):
 
