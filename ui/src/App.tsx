@@ -252,7 +252,7 @@ function Sidebar(props: {
               +
             </button>
           </div>
-          <div className="mt-4 flex flex-col gap-4 overflow-y-auto flex-1 px-6">
+          <div className="mt-4 flex flex-col gap-4 overflow-y-auto flex-1 px-6 w-full">
             {playlists.map((playlist) => (
               <div
                 className="w-full"
@@ -408,6 +408,9 @@ function NewPlaylistDialog(props: {
   const [importPlaylistLoading, setImportPlaylistLoading] = useState(false);
   const [createPlaylistLoading, setCreatePlaylistLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [newPlaylistImageFile, setNewPlaylistImageFile] = useState<File | null>(
+    null,
+  );
 
   async function handleCreatePlaylist() {
     const name = newPlaylistNameRef.current?.value.trim() || "";
@@ -420,7 +423,7 @@ function NewPlaylistDialog(props: {
       setErrorMessage("playlist description cannot be empty");
       return;
     }
-    const imageFile = newPlaylistImageRef.current?.files?.[0];
+    const imageFile = newPlaylistImageFile;
     if (!imageFile) {
       setErrorMessage("please upload a playlist image");
       return;
@@ -538,6 +541,13 @@ function NewPlaylistDialog(props: {
             onClick={() => {
               newPlaylistImageRef.current!.click();
             }}
+            style={{
+              backgroundImage: newPlaylistImageFile
+                ? `url(${URL.createObjectURL(newPlaylistImageFile)})`
+                : "none",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
             ref={newPlaylistImageContainerRef}
           >
             <svg
@@ -573,11 +583,6 @@ function NewPlaylistDialog(props: {
                   const img = new Image();
                   img.src = URL.createObjectURL(file);
                   img.onload = () => {
-                    if (img.width !== img.height) {
-                      setErrorMessage("image should be square");
-                      input.value = "";
-                      return;
-                    }
                     if (img.width < 300 || img.height < 300) {
                       setErrorMessage(
                         "image dimensions should be at least 300x300 pixels",
@@ -586,20 +591,41 @@ function NewPlaylistDialog(props: {
                       return;
                     }
 
-                    // display image preview (validations passed)
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                      if (newPlaylistImageContainerRef.current) {
-                        newPlaylistImageContainerRef.current.style.backgroundImage = `url(${e.target?.result})`;
-                        newPlaylistImageContainerRef.current.style.backgroundSize =
-                          "cover";
-                        newPlaylistImageContainerRef.current.style.backgroundPosition =
-                          "center";
-                        newPlaylistImageContainerRef.current.style.border =
-                          "none";
-                      }
-                    };
-                    reader.readAsDataURL(file);
+                    // crop image to nearest square (centered)
+                    const sideLength = Math.min(img.width, img.height);
+                    const canvas = document.createElement("canvas");
+                    canvas.width = sideLength;
+                    canvas.height = sideLength;
+                    const ctx = canvas.getContext("2d");
+                    const offsetX = (img.width - sideLength) / 2;
+                    const offsetY = (img.height - sideLength) / 2;
+
+                    ctx?.drawImage(
+                      img,
+                      offsetX,
+                      offsetY,
+                      sideLength,
+                      sideLength,
+                      0,
+                      0,
+                      sideLength,
+                      sideLength,
+                    );
+
+                    // get it as a blob
+                    canvas.toBlob(
+                      (blob) => {
+                        if (blob) {
+                          const croppedFile = new File([blob], file.name, {
+                            type: file.type,
+                          });
+
+                          setNewPlaylistImageFile(croppedFile);
+                        }
+                      },
+                      file.type,
+                      0.67, // smaller image quality to reduce file size
+                    );
                   };
                 }
               }}

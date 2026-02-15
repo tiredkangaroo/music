@@ -6,7 +6,7 @@ export function PlaylistHeadView(props: {
   const { playlist, selected } = props;
   return (
     <div
-      className="p-2 gap-4 border-r-4 border-b-4 border-l-2 border-t-2 w-full hover:opacity-80 flex flex-col content-center cursor-pointer"
+      className="p-2 gap-4 border-r-4 border-b-4 border-l-2 border-t-2 w-full max-w-48 hover:opacity-80 flex flex-col content-center cursor-pointer"
       style={{
         borderColor: selected ? "#000" : "#9c9c9c",
         backgroundColor: selected ? "#00000020" : "white",
