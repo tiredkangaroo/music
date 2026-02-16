@@ -110,6 +110,60 @@ func (q *Queries) GetPlaylist(ctx context.Context, id pgtype.UUID) (GetPlaylistR
 	return i, err
 }
 
+const getPlaylistTracksNotDownloaded = `-- name: GetPlaylistTracksNotDownloaded :many
+SELECT tracks.track_id, track_name, duration, popularity, album_id, artist_id, artists, track_release_date, downloaded, lyrics, playlist_id, playlist_tracks.track_id FROM tracks
+JOIN playlist_tracks ON tracks.track_id = playlist_tracks.track_id
+WHERE playlist_tracks.playlist_id = $1 AND tracks.downloaded = FALSE
+`
+
+type GetPlaylistTracksNotDownloadedRow struct {
+	TrackID          string      `json:"track_id"`
+	TrackName        string      `json:"track_name"`
+	Duration         int32       `json:"duration"`
+	Popularity       int32       `json:"popularity"`
+	AlbumID          string      `json:"album_id"`
+	ArtistID         string      `json:"artist_id"`
+	Artists          []string    `json:"artists"`
+	TrackReleaseDate pgtype.Date `json:"track_release_date"`
+	Downloaded       bool        `json:"downloaded"`
+	Lyrics           string      `json:"lyrics"`
+	PlaylistID       pgtype.UUID `json:"playlist_id"`
+	TrackID_2        string      `json:"track_id_2"`
+}
+
+func (q *Queries) GetPlaylistTracksNotDownloaded(ctx context.Context, playlistID pgtype.UUID) ([]GetPlaylistTracksNotDownloadedRow, error) {
+	rows, err := q.db.Query(ctx, getPlaylistTracksNotDownloaded, playlistID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPlaylistTracksNotDownloadedRow
+	for rows.Next() {
+		var i GetPlaylistTracksNotDownloadedRow
+		if err := rows.Scan(
+			&i.TrackID,
+			&i.TrackName,
+			&i.Duration,
+			&i.Popularity,
+			&i.AlbumID,
+			&i.ArtistID,
+			&i.Artists,
+			&i.TrackReleaseDate,
+			&i.Downloaded,
+			&i.Lyrics,
+			&i.PlaylistID,
+			&i.TrackID_2,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTrackByID = `-- name: GetTrackByID :one
 SELECT track_id, track_name, duration, popularity, album_id, artist_id, artists, track_release_date, downloaded, lyrics FROM tracks WHERE track_id = $1
 `

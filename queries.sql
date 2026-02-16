@@ -107,7 +107,10 @@ LEFT JOIN albums a ON t.album_id = a.album_id
 WHERE p.id = $1
 GROUP BY p.id;
 
-
+-- name: GetPlaylistTracksNotDownloaded :many
+SELECT * FROM tracks
+JOIN playlist_tracks ON tracks.track_id = playlist_tracks.track_id
+WHERE playlist_tracks.playlist_id = $1 AND tracks.downloaded = FALSE;
 
 -- name: RemoveTrackFromPlaylist :exec
 DELETE FROM playlist_tracks

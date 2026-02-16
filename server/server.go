@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log/slog"
 	"mime"
@@ -218,11 +219,28 @@ func (s *Server) Serve() error {
 		if trackID == "" {
 			return c.JSON(400, errormap("trackID parameter is required"))
 		}
-		err := s.lib.DownloadIfNotExists(trackID)
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 1*time.Minute)
+		defer cancel()
+		err := s.lib.DownloadIfNotExists(ctx, trackID)
 		if err != nil {
 			return c.JSON(500, errormap(err.Error()))
 		}
 		return c.JSON(200, nil) // should this be a 204?
+	})
+
+	api.POST("/download-playlist/:playlistID", func(c echo.Context) error {
+		playlistID := c.Param("playlistID")
+		if playlistID == "" {
+			return c.JSON(400, errormap("playlistID parameter is required"))
+		}
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Minute)
+		defer cancel()
+
+		err := s.lib.DownloadPlaylist(ctx, playlistID)
+		if err != nil {
+			return c.JSON(500, errormap(err.Error()))
+		}
+		return c.JSON(200, nil)
 	})
 
 	// store an image into storage

@@ -54,15 +54,46 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 		slog.Info("download already in progress, skipping", "thing", thing)
 		return l.dlNoDuplicate.Wait(thing)
 	}
+	slog.Info("acquired download lock", "thing", thing)
 
 	trackID, youtubeURL, err := l.preDownload(thing)
 	if err != nil {
+		slog.Info("pre-download failed (releasing lock)", "thing", thing, "error", err)
 		l.dlNoDuplicate.Remove(thing, err)
 		return err
 	}
-	err = l.download(trackID, youtubeURL)
+	slog.Info("pre-download completed", "thing", thing, "track_id", trackID, "youtube_url", youtubeURL)
+	err = l.download(ctx, trackID, youtubeURL)
+	slog.Info("download completed (releasing lock)", "thing", thing, "error", err)
 	l.dlNoDuplicate.Remove(thing, err)
 	return err
+}
+
+func (l *Library) DownloadPlaylist(ctx context.Context, playlistID string) error {
+	// gets all the tracks from the playlist not downloaded
+	// then downloads them all
+	tracks, err := l.queries.GetPlaylistTracksNotDownloaded(ctx, optuuid(uuid.MustParse(playlistID)))
+	if err != nil {
+		return fmt.Errorf("get playlist: %w", err)
+	}
+	slog.Info("got tracks for playlist bulk dl", "playlist_id", playlistID, "total_tracks", len(tracks))
+	wg := sync.WaitGroup{}
+	for _, track := range tracks {
+		wg.Add(1)
+		slog.Info("queuing track for download from playlist", "track_id", track.TrackID, "track_name", track.TrackName, "playlist_id", playlistID)
+		go func(trackID string) {
+			defer wg.Done()
+			if err := l.Download(ctx, "https://open.spotify.com/track/"+trackID); err != nil {
+				slog.Error("download track from playlist", "error", err, "track_id", trackID, "track_name", track.TrackName, "playlist_id", playlistID)
+			} else {
+				slog.Info("downloaded track from playlist", "track_id", trackID, "track_name", track.TrackName, "playlist_id", playlistID)
+			}
+			slog.Info("finished processing track for playlist download", "track_id", trackID, "track_name", track.TrackName, "playlist_id", playlistID)
+		}(track.TrackID)
+	}
+	wg.Wait()
+	slog.Info("completed downloading tracks for playlist", "playlist_id", playlistID)
+	return nil
 }
 
 // CreateSkeletonTrack creates a skeleton track entry with the track ID (to avoid fkey errors
@@ -77,7 +108,7 @@ func (l *Library) createSkeletonTrack(ctx context.Context, trackID string) error
 	})
 }
 
-func (l *Library) download(trackID, youtubeURL string) error {
+func (l *Library) download(ctx context.Context, trackID, youtubeURL string) error {
 	// acquire a slot to perform downloading
 	l.ongoingDownloads.Acquire()
 	defer l.ongoingDownloads.Release()
@@ -93,7 +124,7 @@ func (l *Library) download(trackID, youtubeURL string) error {
 	ydlArgs = append(ydlArgs, youtubeURL)
 
 	ydlLogs := new(bytes.Buffer)
-	ydlCmd := exec.Command("yt-dlp", ydlArgs...)
+	ydlCmd := exec.CommandContext(ctx, "yt-dlp", ydlArgs...)
 	ydlCmd.Stdout = ydlLogs
 	ydlCmd.Stderr = ydlLogs
 	ydlCmd.Dir = l.storagePath
@@ -103,7 +134,7 @@ func (l *Library) download(trackID, youtubeURL string) error {
 			err = fmt.Errorf("track is age-restricted")
 			return err
 		}
-		slog.Error("yt-dlp command failed", "error", err, "logs", ydlLogs.String())
+		slog.Error("yt-dlp command failed", "error", err, "logs", maxLengthString(ydlLogs.String(), 30))
 		return fmt.Errorf("yt-dlp command failed: %w", err)
 	}
 	slog.Info("downloaded", "track_id", trackID)
@@ -123,11 +154,11 @@ func (l *Library) download(trackID, youtubeURL string) error {
 
 // downloadIfNotExists checks if the track with the specified ID exists in storage,
 // and downloads it if it is missing.
-func (l *Library) downloadIfNotExists(trackID, youtubeURL string) error {
+func (l *Library) downloadIfNotExists(ctx context.Context, trackID, youtubeURL string) error {
 	p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
 	if _, err := os.Stat(p); os.IsNotExist(err) {
 		for range 3 { // try downloading 3 times
-			if err := l.download(trackID, youtubeURL); err != nil {
+			if err := l.download(ctx, trackID, youtubeURL); err != nil {
 				if strings.Contains(err.Error(), "age-restricted") {
 					return err
 				}
@@ -137,7 +168,7 @@ func (l *Library) downloadIfNotExists(trackID, youtubeURL string) error {
 		}
 	} else {
 		slog.Info("track already exists, skipping download", "track_id", trackID)
-		l.queries.MarkTrackAsDownloaded(context.Background(), trackID)
+		l.queries.MarkTrackAsDownloaded(ctx, trackID)
 	}
 	return nil
 }
@@ -147,12 +178,11 @@ func (l *Library) downloadIfNotExists(trackID, youtubeURL string) error {
 // also note: do we need a noDupeDl here?
 func (l *Library) preDownload(thing string) (string, string, error) {
 	slog.Info("pre-downloading", "thing", thing)
-
 	// steps: spotdl url and metadata download
 	// read youtube url (split by \n, idx 1) then read metadata and insert into db
 	// then use yt-dlp to download audio files
 	// spotdl url [thing] --save-file metadata.spotdl --client-id [client id] --client-secret [client secret]
-	safeThingName := sha256.Sum256([]byte(thing)) // use hashed name to avoid issues with special characters in filenames & using different names for different things bc multiple downloads can happen simultaneously
+	safeThingName := sha256.Sum256([]byte(uuid.New().String())) // use hashed random to avoid issues with special characters in filenames & using different names for different things bc multiple downloads can happen simultaneously
 	args := []string{"url"}
 	args = append(args, thing)
 	args = append(args, "--save-file", filepath.Join(l.storagePath, fmt.Sprintf("%x-metadata.spotdl", safeThingName)))
@@ -246,21 +276,21 @@ func (l *Library) preDownload(thing string) (string, string, error) {
 // and downloads it if it is missing. It is intended to be slightly cheaper than Download
 // because it does not run spotdl and does not update the database and extract metadata if
 // the track already exists.
-func (l *Library) DownloadIfNotExists(trackIDs ...string) error {
+func (l *Library) DownloadIfNotExists(ctx context.Context, trackIDs ...string) error {
 	// using ctx.Background() in this function since download if not exists is called
 	// in a goroutine and we shouldn't pass down a request context to pass down
 
 	for i, trackID := range trackIDs {
 		p := filepath.Join(l.storagePath, filepath.Clean(trackID)+".m4a")
 		if _, err := os.Stat(p); os.IsNotExist(err) {
-			if err := l.Download(context.Background(), "https://open.spotify.com/track/"+trackID); err != nil {
+			if err := l.Download(ctx, "https://open.spotify.com/track/"+trackID); err != nil {
 				slog.Error("download track", "error", err, "track_id", trackID, "index", i, "total", len(trackIDs))
 				return err
 			}
 		}
 	}
 	for _, id := range trackIDs {
-		if err := l.queries.MarkTrackAsDownloaded(context.Background(), id); err != nil {
+		if err := l.queries.MarkTrackAsDownloaded(ctx, id); err != nil {
 			slog.Error("mark track as downloaded", "error", err, "track_id", id)
 		}
 	}
@@ -313,7 +343,7 @@ func (l *Library) AddTrackToPlaylist(ctx context.Context, playlistID, trackID st
 	if err != nil {
 		return fmt.Errorf("invalid playlist id: %w", err)
 	}
-	go l.DownloadIfNotExists(trackID) // best effort download, ignore error, work in a seperate goroutine
+	go l.DownloadIfNotExists(context.TODO(), trackID) // best effort download, ignore error, work in a seperate goroutine
 	return l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
 		PlaylistID: optuuid(pid),
 		TrackID:    trackID,
@@ -651,7 +681,7 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (queries
 				return
 			}
 
-			go l.downloadIfNotExists(track.TrackID, youtubeURL)
+			go l.downloadIfNotExists(context.Background(), track.TrackID, youtubeURL)
 			err = l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
 				PlaylistID: optuuid(uuid.MustParse(playlistID)),
 				TrackID:    track.TrackID,

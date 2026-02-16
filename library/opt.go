@@ -93,3 +93,25 @@ func insertParamsFromItem(item spotifyItem) queries.InsertTrackParams {
 		Popularity: item.Popularity,
 	}
 }
+
+func filter[T any](slice []T, predicate func(T) bool) []T {
+	result := make([]T, len(slice))
+	i := 0
+	for _, item := range slice {
+		if predicate(item) {
+			result[i] = item
+			i++
+		}
+	}
+	return result[:i]
+}
+
+func maxLengthString(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	if max <= 12 {
+		return s[:max]
+	}
+	return s[:max-12] + " [truncated]"
+}

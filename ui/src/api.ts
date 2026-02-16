@@ -108,6 +108,15 @@ export async function requestDownload(
   return res.json();
 }
 
+export async function requestDownloadPlaylist(
+  playlistID: string,
+): Promise<WithError<void>> {
+  const res = await fetch(`${API_BASE}/download-playlist/${playlistID}`, {
+    method: "POST",
+  });
+  return res.json();
+}
+
 export async function getTrackLyrics(
   trackID: string,
 ): Promise<WithError<string>> {

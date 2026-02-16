@@ -28,8 +28,14 @@ func (nd *noDuplicate[T]) Remove(key string, value T) {
 	nd.rwmx.Lock()
 	defer nd.rwmx.Unlock()
 	if ch, exists := nd.keys[key]; exists {
-		ch <- value
-		close(nd.keys[key])
+		// send value to waiters before closing the channel (there may be no waiters)
+		select {
+		case ch <- value:
+			close(ch)
+		default:
+			close(ch)
+			slog.Warn("no waiters for key in noDuplicate, value will be lost", "key", key, "value", value)
+		}
 	} else {
 		slog.Warn("you've got a real bad problem rn icl", "key", key)
 	}

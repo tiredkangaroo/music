@@ -8,7 +8,7 @@ import {
   recordPlay,
   recordSkip,
   removeTrackFromPlaylist,
-  requestDownload,
+  requestDownloadPlaylist,
   searchTracks,
 } from "../api";
 import { PlayerContext, SetPlayerContext } from "../PlayerContext.tsx";
@@ -217,25 +217,27 @@ export function PlaylistView(props: {
               <button
                 onClick={() => {
                   setDownloading(true);
-                  let wg = playlist.tracks.length;
-                  function doneTrack() {
-                    wg -= 1;
-                    if (wg === 0) {
-                      setDownloading(false);
+                  requestDownloadPlaylist(playlist.id).then((res) => {
+                    setDownloading(false);
+                    if (res === null) {
+                      console.log(
+                        "requested download for playlist",
+                        playlist.id,
+                      );
+                      return;
                     }
-                  }
-                  for (let i = 0; i < playlist.tracks.length; i++) {
-                    requestDownload(playlist.tracks[i].track_id).then(
-                      (resp) => {
-                        doneTrack();
-                        if (resp.error) {
-                          setAlertMessage(
-                            `Downloading "${playlist.tracks[i].track_name}": ${resp.error}`,
-                          );
-                        }
-                      },
+                    if (res.error) {
+                      setAlertMessage(
+                        `error downloading playlist: ${res.error}`,
+                      );
+                      return;
+                    }
+                    console.log("requested download for playlist", playlist.id);
+                    console.log(
+                      "please check out res (it's not null or with error)",
+                      res,
                     );
-                  }
+                  });
                 }}
               >
                 {downloading ? (
