@@ -22,7 +22,7 @@ jobs:
 
     strategy:
       matrix:
-        goos: [linux]
+        goos: [linux, darwin, windows]
         goarch: [amd64, arm64]
 
     steps:
@@ -37,9 +37,9 @@ jobs:
       - name: Build and zip for ${{ matrix.goos }}/${{ matrix.goarch }}
         run: |
           mkdir -p builds
-          output_name="aux"
-          renamed_binary="aux-${{ matrix.goos }}-${{ matrix.goarch }}"
-          build_dir="builds/aux-${{ matrix.goos }}-${{ matrix.goarch }}"
+          output_name="bigmusic"
+          renamed_binary="bigmusic-${{ matrix.goos }}-${{ matrix.goarch }}"
+          build_dir="builds/bigmusic-${{ matrix.goos }}-${{ matrix.goarch }}"
           binary_path="${build_dir}/${output_name}"
           renamed_path="${build_dir}/${renamed_binary}"
 
@@ -51,14 +51,14 @@ jobs:
 
           mv "$binary_path" "$renamed_path"
 
-          zip_name="aux-${{ matrix.goos }}-${{ matrix.goarch }}.zip"
+          zip_name="bigmusic-${{ matrix.goos }}-${{ matrix.goarch }}.zip"
           (cd "$build_dir" && zip "$zip_name" "$renamed_binary")
 
       - name: Upload zipped build
         uses: actions/upload-artifact@v4
         with:
-          name: aux-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: builds/aux-${{ matrix.goos }}-${{ matrix.goarch }}/*.zip
+          name: bigmusic-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: builds/bigmusic-${{ matrix.goos }}-${{ matrix.goarch }}/*.zip
 
   release:
     name: Create 'latest' GitHub Release
