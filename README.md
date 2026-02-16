@@ -18,6 +18,7 @@ it's a music downloader and player app. this is not a streaming app! this is als
 - you can send multiple downloads for a track and only one download will occur (and if there's an error in that one download, the responses to all requests will show that error).
 - the search is ordered effectively and results get cached in the psql db so it can be faster
 - the update.sh script is so useful
+- it updates the browser's mediaSession API so it'll be more integrated with your system.
 
 ## download process
 
@@ -33,9 +34,13 @@ the search is done using the spotify search api. it's taken a [recent hit](https
 
 yeah! it's [here](https://music.mechanicaldinosaurs.net).
 
+# screenshots
+
+view [this folder](https://github.com/tiredkangaroo/music/tree/main/screenshots).
+
 # how do i run this?
 
-## docker compose
+## easy: docker compose
 
 set the [environment variables](#environment-variables) necessary to run this app.
 
@@ -60,23 +65,3 @@ run the docker compose:
 | KEY_PATH              | not required.                                                                                                  | --                                       | if you want to use TLS, specify the path to the PEM-encoded key. when using docker-compose, your key MUST be in the same folder (or a subfolder) as your Dockerfile and docker-compose.yml (that you will run docker-compose in) and the KEY_PATH should be relative to this folder.                  |
 | POSTGRES_URL          | required, never if using docker-compose.                                                                       | postgres://musicer:@localhost:5432/music | postgres connection string. docker compose provisions postgres so this should never be specified when using compose.                                                                                                                                                                                  |
 | DATA_PATH             | not required.                                                                                                  | /var/lib/musicer/data                    | directory to store downloaded music and temporary files of metadata. also used as storage if not using [tiredkangaroo/storage](https://github.com/tiredkangaroo/storage) instance.                                                                                                                    |
-
-## things i got to do or should do
-
-### high priority (doesn't mean i'll do them though 😝)
-
-- bugsquashing efforts
-- optimize downloads (quite vague ik)
-- make direct calls to spotify instead of using spotdl for metadata? (only use spotdl for yt url, which means we can move spotdl and yt-dlp into download and have direct metadata calls for predownload, should speed things up as we won't be using cli calls, but i would need to find a way to get lyrics or still keep spotdl for lyrics)
-
-### medium priority
-
-- get around youtube age restriction without using cookies? (ex. can't download from surfer rosa bc album cover)
-- update the download button status once downloaded or with loading icon
-
-### low priority (things still work or not too important feature):
-
-- compact mode?
-- api for what the user is listening to?? maybe.
-- mobile ui
-- maybe not direct dom manipulation when lyric is clicked?

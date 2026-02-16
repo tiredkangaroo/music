@@ -37,6 +37,10 @@ export function Player(props: {
         playerState.currentTrack?.track_name,
       );
       setCurrentTime(audioRef.current?.currentTime || 0);
+      console.log(
+        "setting current time in state",
+        playerState.currentTrack?.track_name,
+      );
       setPlayerState({
         ...playerState,
         currentTime: audioRef.current?.currentTime || 0,
