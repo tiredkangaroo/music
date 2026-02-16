@@ -31,16 +31,16 @@ export function Player(props: {
         !audioRef.current
       )
         return;
-      console.log(
-        "time update",
-        audioRef.current?.currentTime,
-        playerState.currentTrack?.track_name,
-      );
+      // console.log(
+      //   "time update",
+      //   audioRef.current?.currentTime,
+      //   playerState.currentTrack?.track_name,
+      // );
       setCurrentTime(audioRef.current?.currentTime || 0);
-      console.log(
-        "setting current time in state",
-        playerState.currentTrack?.track_name,
-      );
+      // console.log(
+      //   "setting current time in state",
+      //   playerState.queuedTracks.map((t) => t.track_name),
+      // );
       setPlayerState({
         ...playerState,
         currentTime: audioRef.current?.currentTime || 0,
@@ -58,7 +58,7 @@ export function Player(props: {
       audioRef.current?.removeEventListener("canplay", onPlaying);
       audioRef.current?.removeEventListener("timeupdate", onTimeUpdate);
     };
-  }, [playerState.currentTrack, audioRef.current]);
+  }, [playerState.currentTrack, audioRef.current, playerState.queuedTracks]);
 
   useEffect(() => {
     if (playerState.isPlaying && currentTime === duration && duration > 0) {

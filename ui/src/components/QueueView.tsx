@@ -92,6 +92,10 @@ export function QueueView(props: {
                   const [draggedTrack] = newQueue.splice(draggedIndex, 1);
                   newQueue.splice(index, 0, draggedTrack);
 
+                  // console.log(
+                  //   "new queue order: ",
+                  //   newQueue.map((t) => t.track_name),
+                  // );
                   setPlayerState({
                     ...playerState,
                     queuedTracks: newQueue,
