@@ -294,7 +294,6 @@ func (s *Server) Serve() error {
 		slog.Info("starting server without TLS", "address", env.DefaultEnv.ServerAddress)
 		return e.Start(env.DefaultEnv.ServerAddress)
 	}
-
 }
 
 func NewServer(lib *library.Library, storage storage.Storage) *Server {
