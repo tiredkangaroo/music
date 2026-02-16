@@ -731,7 +731,7 @@ func NewLibrary(storagePath string, pool *pgxpool.Pool) *Library {
 		queries:                 q,
 		spotifyToken:            new(spotifyToken),
 		dlNoDuplicate:           newNoDuplicate[error](),
-		youtubeURLRegexp:        regexp.MustCompile(`https://(?:music\.)?youtube\.com/[^\s]+`),
+		youtubeURLRegexp:        regexp.MustCompile(`https://(?:(?:www|m|music)\.)?youtube\.com/[^\s]+`),
 		ongoingDownloads:        newSlots(env.DefaultEnv.MaximumOngoingDownloads),
 		maximumOngoingDownloads: env.DefaultEnv.MaximumOngoingDownloads,
 	}
