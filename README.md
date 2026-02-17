@@ -112,3 +112,7 @@ npm run build
 4. set the environment variables necessary. run the binary you just downloaded.
 
 5. done! visit the url shown in the terminal.
+
+# small note
+
+this project is cool and all, but: support your artists!
