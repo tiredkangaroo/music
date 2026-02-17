@@ -430,6 +430,14 @@ function NewPlaylistDialog(props: {
     }
 
     // upload image as binary and get URL
+    if (
+      !imageFile.name.endsWith(".jpg") &&
+      !imageFile.name.endsWith(".jpeg") &&
+      !imageFile.name.endsWith(".png")
+    ) {
+      setErrorMessage("image must be a .jpg, .jpeg, or .png file");
+      return;
+    }
     const imageURL = await uploadImage(imageFile);
     console.log("uploaded image", imageURL);
 

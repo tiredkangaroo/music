@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"mime"
@@ -228,19 +229,61 @@ func (s *Server) Serve() error {
 		return c.JSON(200, nil) // should this be a 204?
 	})
 
-	api.POST("/download-playlist/:playlistID", func(c echo.Context) error {
+	api.GET("/download-playlist/:playlistID", func(c echo.Context) error {
 		playlistID := c.Param("playlistID")
 		if playlistID == "" {
 			return c.JSON(400, errormap("playlistID parameter is required"))
 		}
+
 		ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Minute)
 		defer cancel()
 
-		err := s.lib.DownloadPlaylist(ctx, playlistID)
+		w := c.Response()
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		numTracks, errChan, err := s.lib.DownloadPlaylist(ctx, playlistID)
 		if err != nil {
 			return c.JSON(500, errormap(err.Error()))
 		}
-		return c.JSON(200, nil)
+
+		i := 0
+		b, _ := json.Marshal(map[string]any{
+			"num_tracks": numTracks,
+		})
+		e := Event{Data: b}
+		if err := e.MarshalTo(w); err != nil {
+			slog.Error("marshal event", "error", err)
+		}
+		if err := http.NewResponseController(w).Flush(); err != nil {
+			return err
+		}
+		for err := range errChan {
+			// this is very mid code that needs re-org
+			type ProgressEvent struct {
+				Index int    `json:"index"`
+				Error string `json:"error,omitempty"`
+			}
+			var errString string
+			if err != nil {
+				errString = err.Error()
+			}
+			b, _ := json.Marshal(ProgressEvent{
+				Index: i,
+				Error: errString,
+			})
+
+			e := Event{Data: b}
+			if err := e.MarshalTo(w); err != nil {
+				slog.Error("marshal event", "error", err)
+			}
+			if err := http.NewResponseController(w).Flush(); err != nil {
+				return err
+			}
+			i++
+		}
+		return nil
 	})
 
 	// store an image into storage

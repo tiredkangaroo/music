@@ -69,31 +69,36 @@ func (l *Library) Download(ctx context.Context, thing string) error {
 	return err
 }
 
-func (l *Library) DownloadPlaylist(ctx context.Context, playlistID string) error {
+func (l *Library) DownloadPlaylist(ctx context.Context, playlistID string) (int, chan error, error) {
 	// gets all the tracks from the playlist not downloaded
 	// then downloads them all
 	tracks, err := l.queries.GetPlaylistTracksNotDownloaded(ctx, optuuid(uuid.MustParse(playlistID)))
 	if err != nil {
-		return fmt.Errorf("get playlist: %w", err)
+		return 0, nil, fmt.Errorf("get playlist: %w", err)
 	}
 	slog.Info("got tracks for playlist bulk dl", "playlist_id", playlistID, "total_tracks", len(tracks))
-	wg := sync.WaitGroup{}
-	for _, track := range tracks {
-		wg.Add(1)
-		slog.Info("queuing track for download from playlist", "track_id", track.TrackID, "track_name", track.TrackName, "playlist_id", playlistID)
-		go func(trackID string) {
-			defer wg.Done()
-			if err := l.Download(ctx, "https://open.spotify.com/track/"+trackID); err != nil {
-				slog.Error("download track from playlist", "error", err, "track_id", trackID, "track_name", track.TrackName, "playlist_id", playlistID)
-			} else {
-				slog.Info("downloaded track from playlist", "track_id", trackID, "track_name", track.TrackName, "playlist_id", playlistID)
-			}
-			slog.Info("finished processing track for playlist download", "track_id", trackID, "track_name", track.TrackName, "playlist_id", playlistID)
-		}(track.TrackID)
-	}
-	wg.Wait()
-	slog.Info("completed downloading tracks for playlist", "playlist_id", playlistID)
-	return nil
+
+	errs := make(chan error, len(tracks))
+
+	go func() {
+		var wg sync.WaitGroup
+		wg.Add(len(tracks))
+
+		for _, track := range tracks {
+			trackID := track.TrackID
+
+			go func(trackID string) {
+				defer wg.Done()
+				err := l.Download(ctx, "https://open.spotify.com/track/"+trackID)
+				errs <- err
+			}(trackID)
+		}
+
+		wg.Wait()
+		close(errs)
+	}()
+
+	return len(tracks), errs, nil
 }
 
 // CreateSkeletonTrack creates a skeleton track entry with the track ID (to avoid fkey errors
@@ -134,7 +139,7 @@ func (l *Library) download(ctx context.Context, trackID, youtubeURL string) erro
 			err = fmt.Errorf("track is age-restricted")
 			return err
 		}
-		slog.Error("yt-dlp command failed", "error", err, "logs", maxLengthString(ydlLogs.String(), 30))
+		slog.Error("yt-dlp command failed", "error", err, "logs", ydlLogs.String())
 		return fmt.Errorf("yt-dlp command failed: %w", err)
 	}
 	slog.Info("downloaded", "track_id", trackID)

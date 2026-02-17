@@ -13,6 +13,12 @@ import {
 } from "../api";
 import { PlayerContext, SetPlayerContext } from "../PlayerContext.tsx";
 import { SetAlertMessageContext } from "../AlertMessageContext.tsx";
+
+interface Downloading {
+  numTracks?: number;
+  progress?: number;
+}
+
 export function PlaylistView(props: {
   playlist: Playlist;
   setPlaylist: (playlist: Playlist) => void;
@@ -24,7 +30,8 @@ export function PlaylistView(props: {
   const addTracksDialogRef = useRef<HTMLDialogElement>(null);
 
   const setAlertMessage = useContext(SetAlertMessageContext);
-  const [downloading, setDownloading] = useState(false);
+  const [downloadingProgress, setDownloadingProgress] =
+    useState<Downloading | null>(null);
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -215,46 +222,51 @@ export function PlaylistView(props: {
                 </svg>
               </button>
               <button
-                onClick={() => {
-                  setDownloading(true);
-                  requestDownloadPlaylist(playlist.id).then((res) => {
-                    setDownloading(false);
-                    if (res === null) {
-                      console.log(
-                        "requested download for playlist",
-                        playlist.id,
-                      );
-                      return;
-                    }
-                    if (res.error) {
-                      setAlertMessage(
-                        `error downloading playlist: ${res.error}`,
-                      );
-                      return;
-                    }
-                    console.log("requested download for playlist", playlist.id);
-                    console.log(
-                      "please check out res (it's not null or with error)",
-                      res,
-                    );
+                onClick={async () => {
+                  setDownloadingProgress({
+                    numTracks: undefined,
+                    progress: undefined,
+                  });
+                  const numTracks = await requestDownloadPlaylist(
+                    playlist.id,
+                    (progress, _) => {
+                      // if (error) {
+                      //   setAlertMessage(`Download error: ${error}`);
+                      //   return;
+                      // }
+                      setDownloadingProgress({
+                        numTracks: numTracks,
+                        progress: progress,
+                      });
+                    },
+                  );
+                  setDownloadingProgress({
+                    numTracks: numTracks,
+                    progress: 0,
                   });
                 }}
               >
-                {downloading ? (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="animate-spin animate-spin-slow"
-                  >
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
+                {downloadingProgress ? (
+                  <div className="flex flex-row gap-2">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="animate-spin animate-spin-slow"
+                    >
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                    <p>
+                      {downloadingProgress?.progress}/
+                      {downloadingProgress?.numTracks}
+                    </p>
+                  </div>
                 ) : (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"

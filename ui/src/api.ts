@@ -77,7 +77,10 @@ export async function uploadImage(file: File): Promise<string> {
       return formData;
     })(),
   });
-  if (!res.ok) throw new Error("image upload failed");
+  if (!res.ok) {
+    console.log("image upload failed:", await res.text());
+    throw new Error("image upload failed");
+  }
   const data = await res.json();
   return data.image_url as string;
 }
@@ -108,13 +111,47 @@ export async function requestDownload(
   return res.json();
 }
 
-export async function requestDownloadPlaylist(
+export function requestDownloadPlaylist(
   playlistID: string,
-): Promise<WithError<void>> {
-  const res = await fetch(`${API_BASE}/download-playlist/${playlistID}`, {
-    method: "POST",
+  cb: (progress: number, error?: string) => void,
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = `${API_BASE}/download-playlist/${playlistID}`;
+    const es = new EventSource(url);
+
+    let totalTracks: number | null = null;
+    let resolved = false;
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        // first event has num_tracks
+        if (data.num_tracks !== undefined) {
+          totalTracks = data.num_tracks;
+          resolved = true;
+          resolve(totalTracks!); // resolve the promise with the total # tracks
+          return;
+        }
+
+        // these are the ProgressEvent types that have index and error
+        if (data.index !== undefined) {
+          cb(data.index, data.error); // data.error may be undefined
+        }
+      } catch (err) {
+        if (!resolved) {
+          reject(new Error("failed to parse initial SSE event"));
+          es.close();
+          return;
+        }
+        console.error("failed to parse SSE event:", err);
+      }
+    };
+
+    es.onerror = (err) => {
+      es.close();
+      reject(err);
+    };
   });
-  return res.json();
 }
 
 export async function getTrackLyrics(
