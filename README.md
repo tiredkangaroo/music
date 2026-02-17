@@ -32,7 +32,7 @@ the search is done using the spotify search api. it's taken a [recent hit](https
 
 # demo?
 
-yeah! it's [here](https://music.mechanicaldinosaurs.net).
+yeah! it's [here](https://bigmusic.mechanicaldinosaurs.net).
 
 # screenshots
 
