@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS tracks (
     artists text[] NOT NULL,
     track_release_date date NOT NULL,
     downloaded boolean NOT NULL DEFAULT FALSE,
+    youtube_url text NOT NULL DEFAULT '',
     lyrics text NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS playlists (

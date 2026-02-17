@@ -19,7 +19,8 @@ INSERT INTO tracks (
     artists,
     track_release_date,
     downloaded,
-    lyrics
+    lyrics,
+    youtube_url
 )
 VALUES (
     $7,
@@ -31,7 +32,8 @@ VALUES (
     $11,
     $12,
     $13,
-    $14
+    $14,
+    $15
 )
 ON CONFLICT (track_id) DO UPDATE
 SET
@@ -41,14 +43,19 @@ SET
     album_id = EXCLUDED.album_id,
     artist_id = EXCLUDED.artist_id,
     artists = EXCLUDED.artists,
+    youtube_url = EXCLUDED.youtube_url,
     track_release_date = EXCLUDED.track_release_date,
     lyrics = CASE
     WHEN EXCLUDED.lyrics = '' THEN tracks.lyrics
+    WHEN EXCLUDED.youtube_url = '' THEN tracks.youtube_url
     ELSE EXCLUDED.lyrics
 END;
 
 -- name: GetTrackByID :one
 SELECT * FROM tracks WHERE track_id = $1;
+
+-- name: GetYoutubeURLByTrackID :one
+SELECT youtube_url FROM tracks WHERE track_id = $1;
 
 -- name: GetTrackLyrics :one
 SELECT lyrics FROM tracks WHERE track_id = $1;

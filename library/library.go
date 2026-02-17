@@ -178,6 +178,19 @@ func (l *Library) downloadIfNotExists(ctx context.Context, trackID, youtubeURL s
 // also note: do we need a noDupeDl here?
 func (l *Library) preDownload(thing string) (string, string, error) {
 	slog.Info("pre-downloading", "thing", thing)
+
+	u, err := url.Parse(thing)
+	if u.Scheme == "https" && u.Host == "open.spotify.com" && len(u.Path) > 6 && strings.HasPrefix(u.Path, "/track/") {
+		trackID := strings.TrimPrefix(u.Path, "/track/")
+		if trackID[len(trackID)-1] == '/' { // omit trailing slash if it exists
+			trackID = trackID[:len(trackID)-1]
+		}
+		if youtubeURL, err := l.queries.GetYoutubeURLByTrackID(context.Background(), trackID); err == nil && youtubeURL != "" {
+			slog.Info("found youtube url in db, skipping spotdl", "track_id", trackID, "youtube_url", youtubeURL)
+			return trackID, youtubeURL, nil
+		}
+	}
+
 	// steps: spotdl url and metadata download
 	// read youtube url (split by \n, idx 1) then read metadata and insert into db
 	// then use yt-dlp to download audio files
@@ -265,6 +278,7 @@ func (l *Library) preDownload(thing string) (string, string, error) {
 		Popularity:       m.Popularity,
 		TrackReleaseDate: track_date,
 		Lyrics:           m.Lyrics,
+		YoutubeUrl:       youtubeURL,
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("insert track: %w", err)
@@ -674,14 +688,13 @@ func (l *Library) Import(ctx context.Context, spotifyPlaylistID string) (queries
 			// avoid fkey errors by doing predownload which also inserts the track metadata
 			trackURL := "https://open.spotify.com/track/" + track.TrackID
 
-			_, youtubeURL, err := l.preDownload(trackURL)
-			l.dlNoDuplicate.Remove(trackURL, err)
+			_, youtube_url, err := l.preDownload(trackURL)
 			if err != nil {
 				slog.Warn("pre-download track for imported playlist", "error", err, "track_id", track.TrackID)
 				return
 			}
 
-			go l.downloadIfNotExists(context.Background(), track.TrackID, youtubeURL)
+			go l.downloadIfNotExists(context.Background(), track.TrackID, youtube_url)
 			err = l.queries.AddTrackToPlaylist(ctx, queries.AddTrackToPlaylistParams{
 				PlaylistID: optuuid(uuid.MustParse(playlistID)),
 				TrackID:    track.TrackID,

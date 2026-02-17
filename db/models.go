@@ -51,5 +51,6 @@ type Track struct {
 	Artists          []string    `json:"artists"`
 	TrackReleaseDate pgtype.Date `json:"track_release_date"`
 	Downloaded       bool        `json:"downloaded"`
+	YoutubeUrl       string      `json:"youtube_url"`
 	Lyrics           string      `json:"lyrics"`
 }
