@@ -28,7 +28,7 @@ it's a music downloader and player app. this is not a streaming app! this is als
 
 ## searching
 
-the search is done using the spotify search api. it's taken a [recent hit](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide) with the loss of the popularity field, while i was making this app.
+the search is done using the spotify search api. while i was making this app, it's taken a [recent hit](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide) with the loss of the popularity field
 
 # demo?
 
