@@ -153,13 +153,13 @@ func (s *Server) Serve() error {
 	}) error {
 		u, err := url.Parse(req.SpotifyPlaylistURL)
 		if err != nil {
-			return c.JSON(400, errormap("invalid spotify url"))
+			return c.JSON(400, errormap("malformed spotify playlist url"))
 		}
 		if u.Host != "open.spotify.com" {
-			return c.JSON(400, errormap("invalid spotify url"))
+			return c.JSON(400, errormap("the url provided must be from open.spotify.com"))
 		}
 		if u.Path[:10] != "/playlist/" {
-			return c.JSON(400, errormap("invalid spotify url"))
+			return c.JSON(400, errormap("the url provided is not the url for a spotify playlist"))
 		}
 		spotifyPlaylistID := u.Path[10:]
 
